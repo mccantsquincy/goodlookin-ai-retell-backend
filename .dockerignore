@@ -1,0 +1,17 @@
+.venv
+.git
+.pytest_cache
+.ruff_cache
+__pycache__
+*.pyc
+*.egg-info
+.env*
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+service-account*.json
+business.local.json
+tests
+/private/tmp
