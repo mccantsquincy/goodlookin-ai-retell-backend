@@ -1,4 +1,5 @@
 """Synthetic examples: no real agent exports or credentials in GitHub."""
+
 from scripts.audit_retell_export import audit_export
 
 BASE = "https://api.example.test"
@@ -14,24 +15,30 @@ def make_export():
             "start_node_id": "start",
             "nodes": [
                 {
-                    "id": "start", "type": "function", "tool_id": "context",
+                    "id": "start",
+                    "type": "function",
+                    "tool_id": "context",
                     "edges": [{"destination_node_id": "intake"}],
                 },
                 {
-                    "id": "intake", "type": "subagent", "tool_ids": ["lead"],
+                    "id": "intake",
+                    "type": "subagent",
+                    "tool_ids": ["lead"],
                     "else_edge": {"destination_node_id": "end"},
                 },
                 {"id": "end", "type": "end"},
                 {"id": "booking", "type": "function", "tool_id": "book"},
                 {
-                    "id": "safety", "type": "conversation",
+                    "id": "safety",
+                    "type": "conversation",
                     "global_node_setting": {"condition": {"type": "prompt"}},
                     "skip_response_edge": {"destination_node_id": "end"},
                 },
             ],
             "tools": [
                 {
-                    "name": "get_business_context", "tool_id": "context",
+                    "name": "get_business_context",
+                    "tool_id": "context",
                     "url": BASE + "/v1/retell/tools/get_business_context",
                 },
                 {"name": "save_lead", "tool_id": "lead", "url": BASE + "/v1/retell/tools/save_lead"},

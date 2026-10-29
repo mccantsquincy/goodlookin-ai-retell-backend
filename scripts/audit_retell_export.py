@@ -3,6 +3,7 @@
 python -m scripts.audit_retell_export path/to/export.json --base-url https://api.example.com
 This cannot confirm a live deployment, prompt transitions, or a real calendar.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -10,23 +11,30 @@ import json
 from pathlib import Path
 from urllib.parse import urlsplit
 
-EXPECTED_TOOLS = frozenset({
-    "get_business_context", "save_lead", "check_service_eligibility",
-    "get_available_appointments", "book_appointment", "get_booking_status",
-    "request_callback",
-})
-BOOKING_TOOLS = frozenset({
-    "check_service_eligibility", "get_available_appointments",
-    "book_appointment", "get_booking_status",
-})
+EXPECTED_TOOLS = frozenset(
+    {
+        "get_business_context",
+        "save_lead",
+        "check_service_eligibility",
+        "get_available_appointments",
+        "book_appointment",
+        "get_booking_status",
+        "request_callback",
+    }
+)
+BOOKING_TOOLS = frozenset(
+    {
+        "check_service_eligibility",
+        "get_available_appointments",
+        "book_appointment",
+        "get_booking_status",
+    }
+)
 
 
 def destinations(node: dict) -> set[str]:
     """Follow regular, else and skip edges; never attempt to interpret prompts."""
-    result = {
-        edge["destination_node_id"] for edge in node.get("edges", [])
-        if edge.get("destination_node_id")
-    }
+    result = {edge["destination_node_id"] for edge in node.get("edges", []) if edge.get("destination_node_id")}
     for key in ("else_edge", "skip_response_edge"):
         edge = node.get(key)
         if edge and edge.get("destination_node_id"):
@@ -62,10 +70,7 @@ def audit_export(data: dict, base_url: str | None = None) -> dict:
             tool_ids.add(node["tool_id"])
         tool_ids.update(node.get("tool_ids", []))
     tool_by_name = {tool["name"]: tool for tool in tools}
-    reachable_tools = sorted(
-        name for name, tool in tool_by_name.items()
-        if tool.get("tool_id") in tool_ids
-    )
+    reachable_tools = sorted(name for name, tool in tool_by_name.items() if tool.get("tool_id") in tool_ids)
 
     url_issues = []
     expected_base = base_url.rstrip("/") if base_url else None
