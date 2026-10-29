@@ -1,0 +1,14 @@
+{
+  "company_name": "FICTIONAL ROOFING DEMO - APPOINTMENTS ARE SIMULATED",
+  "business_hours": {},
+  "services": ["inspection"],
+  "approved_faqs": [],
+  "booking_enabled": true,
+  "transfer_available": false,
+  "transfer_phone_number": null,
+  "callback_expectation": "This is a simulated demonstration. The callback request is recorded locally; no callback will be made.",
+  "eligible_states": ["AZ"],
+  "eligible_postal_codes": ["85001"],
+  "eligible_services": ["inspection"],
+  "appointment_type": "inspection"
+}
