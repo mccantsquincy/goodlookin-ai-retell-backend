@@ -9,10 +9,10 @@ from app.config import Settings
 PASSWORD = "this-is-a-strong-test-password"
 
 
-async def tool(client, name: str, call_id: str, **args):
+async def tool(client, tool_name: str, call_id: str, **args):
     return await client.post(
-        f"/v1/retell/tools/{name}",
-        json={"name": name, "call": {"call_id": call_id}, "args": args},
+        f"/v1/retell/tools/{tool_name}",
+        json={"name": tool_name, "call": {"call_id": call_id}, "args": args},
     )
 
 
