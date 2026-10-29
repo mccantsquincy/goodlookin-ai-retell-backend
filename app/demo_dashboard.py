@@ -112,7 +112,8 @@ def dashboard_html(counts: dict[str, int], rows: list[dict[str, str | bool]]) ->
 *{{box-sizing:border-box}} body{{margin:0;background:#0e1015;color:#fafafa;font:16px system-ui,Arial,sans-serif}}
 main{{max-width:1100px;margin:0 auto;padding:38px 20px}} .eyebrow{{color:#ff8d3f;text-transform:uppercase;
 letter-spacing:.16em;font-size:12px;font-weight:700}} h1{{margin:10px 0;font-size:clamp(26px,4vw,42px)}}
-p{{color:#c5c7cc;line-height:1.6}} .grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;
+p{{color:#c5c7cc;line-height:1.6}}
+.grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;
 margin:28px 0}}
 .stat{{background:#1a1d24;border:1px solid #323742;border-radius:15px;padding:22px}}
 .number{{font-size:35px;font-weight:750;color:#ff8838}} .label{{color:#b7bbc4;font-size:13px;margin-top:6px}}
