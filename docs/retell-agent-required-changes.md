@@ -1,14 +1,37 @@
-# Required Retell dashboard changes before release
+# Retell Composer release checklist — v2 export
 
-The source export in Downloads is reference data and has not been modified. Its seven custom tools use the wrapped `{name, call: {call_id}, args}` request. Update the staged agent configuration as follows:
+This checklist reflects the privately shared *Summit Roofing Receptionist v2* export, not the initial Composer draft. For full context, see [Engineering Notes #02](engineering-notes-02-composer-agent-architecture.md). Do not commit a raw agent export or tokens to this public repository.
 
-1. Replace every `REPLACE-WITH-BACKEND-BASE-URL` tool and webhook URL with the deployed HTTPS backend URL.
-2. Map `transfer_phone_number` from `data.transfer_phone_number` in `get_business_context` response variables. The export currently maps `transfer_available` but omits the number.
-3. Gate the global human handoff node on `transfer_available == true` and a configured transfer number.
-4. Route unavailable and failed transfers to `request_callback`; verify a durable callback response before promising follow-up.
-5. Change fallback intake to call `save_lead` and, when appropriate, `request_callback`, or remove wording that implies information was saved. The present fallback ending can claim follow-up without persistence.
-6. Require confirmed callback phone, property address, service, and `save_lead` success before the intake completion transition to eligibility. Use `data.missing_fields` and `data.saved`, not only a prompt transition.
-7. Keep the agent on a staging tag until signed endpoint, booking, timeout, callback, and transfer release tests pass. The export shows no assigned tags and is published.
-8. Review the current `everything` data retention setting, empty PII categories, contact memory read setting, empty fallback voices, and 60-minute maximum call duration with the owner and privacy team.
+## Already present in v2
 
-The eligibility configuration, services, hours, transfer number, and callback wording must be approved and replaced before any production use. The backend defaults deliberately contain no actual Summit Roofing facts.
+- All seven custom tools use the existing Railway staging API host.
+- Webhooks are directed to the staging `/v1/retell/webhooks` endpoint.
+- The global prompt correctly disallows unapproved services, coverage and booking claims.
+- Fallback intake states the backend is unavailable and **does not** claim an unsaved callback was received.
+- Human handoff is a **callback offer**, not an actual phone transfer.
+
+## For a safe, working voice demo
+
+- [ ] Confirm which agent version is actually active. Export v2 is `is_published: false` with no assigned tags.
+- [ ] Verify signed `get_business_context` request and response-variable mappings through an actual Retell test call.
+- [ ] Verify `save_lead` and `request_callback` with fictional contact details; do not promise an office notification.
+- [ ] Test unknown FAQ, urgent hazard, human request, and unavailable backend.
+- [ ] Confirm staging does not book, transfer, or invent service areas / operating hours.
+- [ ] Bring GitHub CI and Railway deployment freshness into a known good state.
+
+## For a booking demo
+
+- [ ] Add the currently missing `collect_lead_details → check_eligibility` transition.
+- [ ] Require a saved lead and complete confirmed intake before eligibility is checked.
+- [ ] Require `ok: true`, eligible result, and `booking_enabled: true` before availability.
+- [ ] If still simulated, **tell the caller explicitly** it is not a real appointment.
+- [ ] Test stale slot and uncertain booking responses through `get_booking_status`.
+- [ ] Map `data.transfer_phone_number` before implementing real handoff.
+
+## For a real-business pilot
+
+- [ ] Configure owner-approved coverage, hours, supported services, intake, FAQ and transfer rules.
+- [ ] Replace simulated calendar availability with an actual provider-backed adapter.
+- [ ] Add lead/callback notifications and delivery monitoring.
+- [ ] Review consent, retention and PII treatment; v2 stores everything, has no PII categories selected and has memory reading on.
+- [ ] Verify retries, no duplicate bookings, signature validation and end-to-end customer outcomes.

@@ -109,3 +109,10 @@ and a pilot. For beginner-friendly code tracing, see
 
 The demonstration uses a fake calendar and only stores callback requests.
 It **does not** place real appointments or notify a roofing business.
+
+## Retell Composer architecture
+
+See [Engineering Notes #02](docs/engineering-notes-02-composer-agent-architecture.md) for
+the exported v2 conversation flow, reachable tools, integration gaps and demo
+acceptance criteria. To statically inspect a **private** Composer JSON export
+without uploading it to GitHub, run `python -m scripts.audit_retell_export --help`.
