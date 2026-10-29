@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       APP_ENV: test
-      DATABASE_URL: sqlite+aiosqlite:///:memory:
+      DATABASE_URL: 'sqlite+aiosqlite:///:memory:'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -44,7 +44,7 @@ jobs:
           --health-retries 10
     env:
       APP_ENV: test
-      DATABASE_URL: postgresql+asyncpg://demo_test:test_only_password@localhost:5432/demo_test
+      DATABASE_URL: 'postgresql+asyncpg://demo_test:test_only_password@localhost:5432/demo_test'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
