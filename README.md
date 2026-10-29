@@ -104,8 +104,8 @@ For Railway's three-service staging setup and verification steps, see [`docs/rai
 For the **fictional, local-only** backend demo, follow
 [docs/demo-first-roadmap.md](docs/demo-first-roadmap.md). It includes the
 seven-tool smoke test, setup instructions and the distinction between a demo
-and a pilot. For the first Build Breakdown and code tracing, see
-[docs/build-breakdown-01-lead-intake.md](docs/build-breakdown-01-lead-intake.md).
+and a pilot. For Engineering Notes #01 and code tracing, see
+[docs/engineering-notes-01-lead-intake.md](docs/build-breakdown-01-lead-intake.md).
 
 The demonstration uses a fake calendar and only stores callback requests.
 It **does not** place real appointments or notify a roofing business.
