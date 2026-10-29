@@ -151,7 +151,7 @@ def create_app(
                         "code": code,
                         "elapsed_ms": round((time.monotonic() - started) * 1000, 2),
                     }
-                )
+                ),
             )
 
     def register(name: str) -> None:
