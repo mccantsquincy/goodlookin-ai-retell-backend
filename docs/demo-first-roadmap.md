@@ -1,7 +1,7 @@
-# Goodlookin AI: demo-first build and study guide
+# Goodlookin AI: demo-first build guide
 
-This guide is written for someone learning backend engineering while building a product.
-**Read it in order.** The goal of this PR is a **repeatable local demo**, not a live
+This guide documents the backend as we build a real product.
+**Follow the implementation in order.** The goal of this PR is a **repeatable local demo**, not a live
 customer-ready receptionist.
 
 ## Our goal
@@ -121,7 +121,7 @@ Each successful run writes synthetic records into your local PostgreSQL database
 If it fails, check that /ready reports ready, your .env path is correct, and
 you have restarted Uvicorn since changing .env.
 
-## See the API while you learn
+## Explore the API while you build
 
 Open http://127.0.0.1:8000/docs to view FastAPI's endpoint schemas.
 Do not use the public Retell webhook URL for the unsigned local smoke script.
@@ -135,7 +135,7 @@ Read code in this order:
 5. app/db.py: Which records survive a restart?
 6. app/webhooks.py: Why is call-end event handling separate?
 
-### Trace exercise
+### Code trace challenge
 
 When the script asks for an appointment:
 
@@ -145,7 +145,7 @@ When the script asks for an appointment:
 4. If a calendar call times out after writing, how can get_booking_status recover?
 5. Why is a queued callback **not** proof that someone was notified?
 
-Answer key: AvailabilityArgs; eligibility() in app/business.py, called from
+Reference answers: AvailabilityArgs; eligibility() in app/business.py, called from
 app/service.py; offer_expiration(); calendar.lookup() through reconcile(); and because
 request_callback() persists a database record but has no notification dispatcher.
 
