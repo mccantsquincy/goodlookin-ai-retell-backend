@@ -116,3 +116,12 @@ See [Engineering Notes #02](docs/engineering-notes-02-composer-agent-architectur
 the exported v2 conversation flow, reachable tools, integration gaps and demo
 acceptance criteria. To statically inspect a **private** Composer JSON export
 without uploading it to GitHub, run `python -m scripts.audit_retell_export --help`.
+
+## Private operations demo preview
+
+The staging-only read-only dashboard at `/demo` is disabled until
+`DEMO_DASHBOARD_USERNAME` and a unique 16+-character `DEMO_DASHBOARD_PASSWORD`
+are configured. It shows anonymous counts and call states, **not contact
+information, real bookings or delivered office notifications**. See
+[Engineering Notes #03](docs/engineering-notes-03-demo-operations.md) for setup,
+security boundaries and the next demo-to-pilot milestones.
