@@ -6,6 +6,7 @@ import pytest
 from pydantic import SecretStr
 
 from app.config import Settings
+
 PASSWORD = "this-is-a-strong-test-password"
 
 
