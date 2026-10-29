@@ -18,7 +18,7 @@ line-length = 120
 select = ["E", "F", "I", "UP", "B"]
 
 [tool.setuptools.packages.find]
-include = ["app*"]
+include = ["app*", "scripts*"]
 
 [tool.setuptools.package-data]
 app = ["business.local.example.json", "business.staging.json"]

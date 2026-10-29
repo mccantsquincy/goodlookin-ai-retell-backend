@@ -3,6 +3,7 @@
 No Retell, CRM or calendar credentials are required. This script intentionally
 refuses non-loopback hosts; it MUST NOT be used for production traffic.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -96,9 +97,7 @@ def run(base: str) -> None:
     selected = None
     for days_ahead in range(2, 16):
         day = (datetime.now(ZONE) + timedelta(days=days_ahead)).date().isoformat()
-        slots = call_tool(
-            base, "get_available_appointments", call_id, lead_id=lead_id, preferred_date=day
-        )["slots"]
+        slots = call_tool(base, "get_available_appointments", call_id, lead_id=lead_id, preferred_date=day)["slots"]
         if slots:
             selected = slots[0]["slot_id"]
             break
@@ -106,21 +105,16 @@ def run(base: str) -> None:
         raise RuntimeError("No simulated slots available over the next 14 days")
     steps.append("Simulated appointment offered")
 
-    booked = call_tool(
-        base, "book_appointment", call_id,
-        lead_id=lead_id, slot_id=selected, caller_confirmed=True
-    )
+    booked = call_tool(base, "book_appointment", call_id, lead_id=lead_id, slot_id=selected, caller_confirmed=True)
     checked_booking = call_tool(
-        base, "get_booking_status", call_id,
-        lead_id=lead_id, operation_id=booked["operation_id"]
+        base, "get_booking_status", call_id, lead_id=lead_id, operation_id=booked["operation_id"]
     )
     if checked_booking["status"] != "confirmed":
         raise RuntimeError("Simulated booking did not reach confirmed state")
     steps.append("Booking created and reconciled")
 
     callback = call_tool(
-        base, "request_callback", call_id,
-        lead_id=lead_id, reason="Synthetic follow-up", urgency="routine"
+        base, "request_callback", call_id, lead_id=lead_id, reason="Synthetic follow-up", urgency="routine"
     )
     if callback["status"] != "queued":
         raise RuntimeError("Callback was not queued")
