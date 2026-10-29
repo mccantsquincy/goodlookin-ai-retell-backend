@@ -290,3 +290,95 @@ async def test_two_callers_cannot_book_same_underlying_slot(harness):
     assert denied.json()["code"] == "SLOT_UNAVAILABLE"
     async with app.state.sessions() as session:
         assert await session.scalar(select(func.count()).select_from(Appointment)) == 1
+
+
+@pytest.mark.asyncio
+async def test_explicit_null_optional_fields_allow_lead_and_callback(harness):
+    """Composer can send null for facts not yet collected."""
+    client, app, _ = harness
+    call_id = "nullable-intake-call"
+    result = await tool(
+        client,
+        "save_lead",
+        call_id,
+        callback_phone="6025550101",
+        name=None,
+        email=None,
+        street_address=None,
+        city=None,
+        state=None,
+        postal_code=None,
+        issue_summary=None,
+        authorized_contact=None,
+    )
+    body = result.json()
+    assert result.status_code == 200
+    assert body["ok"] is True
+    assert body["data"]["saved"] is True
+    lead_id = body["data"]["lead_id"]
+    assert "street_address" in body["data"]["missing_fields"]
+
+    callback = await tool(
+        client,
+        "request_callback",
+        call_id,
+        lead_id=lead_id,
+        reason="Please follow up about an inspection",
+        urgency="routine",
+        preferred_callback_window=None,
+    )
+    assert callback.json()["ok"] is True
+    assert callback.json()["data"]["status"] == "queued"
+    async with app.state.sessions() as session:
+        assert await session.scalar(select(func.count()).select_from(Lead)) == 1
+        assert await session.scalar(select(func.count()).select_from(CallbackRequest)) == 1
+
+
+@pytest.mark.asyncio
+async def test_null_update_never_erases_confirmed_details(harness):
+    client, app, _ = harness
+    call_id = "nullable-update-call"
+    first = await tool(
+        client,
+        "save_lead",
+        call_id,
+        callback_phone="6025550101",
+        name="Test Caller",
+        street_address="123 Test Street",
+    )
+    assert first.json()["ok"] is True
+    lead_id = first.json()["data"]["lead_id"]
+
+    update = await tool(
+        client,
+        "save_lead",
+        call_id,
+        lead_id=lead_id,
+        callback_phone="6025550101",
+        name=None,
+        street_address=None,
+        email=None,
+    )
+    assert update.json()["ok"] is True
+    async with app.state.sessions() as session:
+        lead = await session.get(Lead, lead_id)
+        assert lead.name == "Test Caller"
+        assert lead.street_address == "123 Test Street"
+
+
+@pytest.mark.asyncio
+async def test_invalid_blank_field_has_http_200_but_warning_business_code(harness, caplog):
+    client, _, _ = harness
+    with caplog.at_level(logging.WARNING, logger="roofing.api"):
+        response = await tool(
+            client,
+            "save_lead",
+            "blank-email-call",
+            callback_phone="6025550101",
+            email="",
+        )
+    assert response.status_code == 200
+    assert response.json()["ok"] is False
+    assert response.json()["code"] == "INVALID_FIELD_VALUE"
+    assert "INVALID_FIELD_VALUE" in caplog.text
+    assert "6025550101" not in caplog.text
