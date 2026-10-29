@@ -98,3 +98,14 @@ The included `Dockerfile` starts the API and applies Alembic migrations before b
 The public webhook URL is `https://<assigned-host>/v1/retell/webhooks`; each custom tool is under `https://<assigned-host>/v1/retell/tools/<tool-name>`. Test `/ready` over HTTPS before connecting Retell. Do not use the local development signature bypass on the hosted service.
 
 For Railway's three-service staging setup and verification steps, see [`docs/railway-staging.md`](docs/railway-staging.md).
+
+## Demo-first development
+
+For the **fictional, local-only** backend demo, follow
+[docs/demo-first-roadmap.md](docs/demo-first-roadmap.md). It includes the
+seven-tool smoke test, setup instructions and the distinction between a demo
+and a pilot. For beginner-friendly code tracing, see
+[docs/lesson-01-lead-intake.md](docs/lesson-01-lead-intake.md).
+
+The demonstration uses a fake calendar and only stores callback requests.
+It **does not** place real appointments or notify a roofing business.
