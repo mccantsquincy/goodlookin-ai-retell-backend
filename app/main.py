@@ -18,6 +18,7 @@ from app.config import Settings
 from app.contracts import ARG_MODELS, ToolRequest, ToolResponse
 from app.crm import CRMAdapter, LocalCRM
 from app.db import get_session, session_factory
+from app.demo_dashboard import build_dashboard_router
 from app.security import verified_body
 from app.service import (
     BusinessFailure,
@@ -64,6 +65,7 @@ def create_app(
     app.state.calendar = calendar
     app.state.crm = crm
     app.state.sessions = sessions
+    app.include_router(build_dashboard_router(settings, sessions))
 
     async def database_session() -> AsyncIterator[AsyncSession]:
         async with sessions() as session:
