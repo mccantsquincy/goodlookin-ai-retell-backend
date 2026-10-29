@@ -379,6 +379,6 @@ async def test_invalid_blank_field_has_http_200_but_warning_business_code(harnes
         )
     assert response.status_code == 200
     assert response.json()["ok"] is False
-    assert response.json()["code"] == "INVALID_FIELD_VALUE"
-    assert "INVALID_FIELD_VALUE" in caplog.text
+    assert response.json()["code"] == "INVALID_EMAIL"
+    assert "INVALID_EMAIL" in caplog.text
     assert "6025550101" not in caplog.text
