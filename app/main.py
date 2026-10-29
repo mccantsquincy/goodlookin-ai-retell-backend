@@ -139,7 +139,10 @@ def create_app(
                 content=ToolResponse(ok=False, code=code, data={}, request_id=request_id).model_dump(),
             )
         finally:
-            log.info(
+            # Retell gets HTTP 200 even for business validation errors.
+            # Warn with safe error codes, never with caller-provided fields.
+            log.log(
+                logging.WARNING if code != "OK" else logging.INFO,
                 json.dumps(
                     {
                         "request_id": request_id,
@@ -148,7 +151,7 @@ def create_app(
                         "code": code,
                         "elapsed_ms": round((time.monotonic() - started) * 1000, 2),
                     }
-                )
+                ),
             )
 
     def register(name: str) -> None:

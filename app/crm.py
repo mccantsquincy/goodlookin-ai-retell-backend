@@ -23,7 +23,9 @@ class LocalCRM:
         if args.lead_id and (not lead or lead.id != args.lead_id):
             raise LookupError("LEAD_NOT_FOUND")
         normalized_phone = phone(args.callback_phone)
-        updates = args.model_dump(exclude_unset=True, exclude={"lead_id", "callback_phone"})
+        # Retell may send null for optional facts the caller hasn't supplied.
+        # Ignore null on retries instead of erasing already confirmed lead fields.
+        updates = args.model_dump(exclude_unset=True, exclude_none=True, exclude={"lead_id", "callback_phone"})
         for field, normalizer in (("email", email), ("state", state), ("postal_code", postal_code)):
             if field in updates and updates[field] is not None:
                 updates[field] = normalizer(updates[field])
