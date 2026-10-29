@@ -49,9 +49,7 @@ async def dashboard_data(session: AsyncSession) -> tuple[dict[str, int], list[di
     ):
         counts[label] = (await session.scalar(select(func.count()).select_from(model))) or 0
 
-    calls = (
-        await session.scalars(select(CallSession).order_by(CallSession.created_at.desc()).limit(20))
-    ).all()
+    calls = (await session.scalars(select(CallSession).order_by(CallSession.created_at.desc()).limit(20))).all()
     ids = [call.call_id for call in calls]
     if not ids:
         return counts, []
@@ -95,17 +93,20 @@ def dashboard_html(counts: dict[str, int], rows: list[dict[str, str | bool]]) ->
             ("appointments", "Simulated appointments"),
         )
     )
-    table_rows = "".join(
-        "<tr>"
-        f"<td><code>{escape(str(item['reference']))}</code></td>"
-        f"<td>{escape(str(item['created_at']))}</td>"
-        f"<td>{escape(str(item['status']))}</td>"
-        f"<td>{'Saved' if item['lead'] else '—'}</td>"
-        f"<td>{'Queued' if item['callback'] else '—'}</td>"
-        f"<td>{'Simulated' if item['simulated_booking'] else '—'}</td>"
-        "</tr>"
-        for item in rows
-    ) or '<tr><td colspan="6">No call activity recorded yet. Run a fictional Retell test call.</td></tr>'
+    table_rows = (
+        "".join(
+            "<tr>"
+            f"<td><code>{escape(str(item['reference']))}</code></td>"
+            f"<td>{escape(str(item['created_at']))}</td>"
+            f"<td>{escape(str(item['status']))}</td>"
+            f"<td>{'Saved' if item['lead'] else '—'}</td>"
+            f"<td>{'Queued' if item['callback'] else '—'}</td>"
+            f"<td>{'Simulated' if item['simulated_booking'] else '—'}</td>"
+            "</tr>"
+            for item in rows
+        )
+        or '<tr><td colspan="6">No call activity recorded yet. Run a fictional Retell test call.</td></tr>'
+    )
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Goodlookin AI · Staging Operations</title><style>

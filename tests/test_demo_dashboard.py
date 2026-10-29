@@ -70,8 +70,12 @@ async def test_dashboard_only_shows_aggregates_and_anonymous_activity(harness):
     assert lead_response.json()["ok"] is True
     lead_id = lead_response.json()["data"]["lead_id"]
     callback_response = await tool(
-        client, "request_callback", "pii-call-reference", lead_id=lead_id,
-        reason="Do not display private reason", urgency="routine"
+        client,
+        "request_callback",
+        "pii-call-reference",
+        lead_id=lead_id,
+        reason="Do not display private reason",
+        urgency="routine",
     )
     assert callback_response.json()["ok"] is True
 
@@ -83,9 +87,14 @@ async def test_dashboard_only_shows_aggregates_and_anonymous_activity(harness):
     assert "Simulated appointments" in result.text
     assert result.headers["x-content-type-options"] == "nosniff"
     for sensitive in (
-        "Sensitive Customer", "6025550101", "private@example.com",
-        "123 Secret Address", "Never display this roof problem",
-        "Do not display private reason", "pii-call-reference", lead_id,
+        "Sensitive Customer",
+        "6025550101",
+        "private@example.com",
+        "123 Secret Address",
+        "Never display this roof problem",
+        "Do not display private reason",
+        "pii-call-reference",
+        lead_id,
     ):
         assert sensitive not in result.text
 
@@ -93,11 +102,15 @@ async def test_dashboard_only_shows_aggregates_and_anonymous_activity(harness):
 def test_dashboard_credentials_require_both_sides_and_long_password():
     with pytest.raises(ValueError, match="DEMO_DASHBOARD"):
         Settings(
-            app_env="test", database_url="sqlite+aiosqlite:///:memory:",
-            demo_dashboard_username="owner", demo_dashboard_password="",
+            app_env="test",
+            database_url="sqlite+aiosqlite:///:memory:",
+            demo_dashboard_username="owner",
+            demo_dashboard_password="",
         )
     with pytest.raises(ValueError, match="DEMO_DASHBOARD"):
         Settings(
-            app_env="test", database_url="sqlite+aiosqlite:///:memory:",
-            demo_dashboard_username="owner", demo_dashboard_password="short",
+            app_env="test",
+            database_url="sqlite+aiosqlite:///:memory:",
+            demo_dashboard_username="owner",
+            demo_dashboard_password="short",
         )
