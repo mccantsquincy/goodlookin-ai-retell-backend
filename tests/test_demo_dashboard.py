@@ -6,9 +6,14 @@ import pytest
 from pydantic import SecretStr
 
 from app.config import Settings
-from tests.conftest import tool
-
 PASSWORD = "this-is-a-strong-test-password"
+
+
+async def tool(client, name: str, call_id: str, **args):
+    return await client.post(
+        f"/v1/retell/tools/{name}",
+        json={"name": name, "call": {"call_id": call_id}, "args": args},
+    )
 
 
 def basic(user: str, password: str) -> dict[str, str]:
