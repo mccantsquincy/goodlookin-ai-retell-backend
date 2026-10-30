@@ -1,4 +1,5 @@
 """FAQ and ZIP coverage are deterministic, grounded, and caller-independent."""
+
 from pathlib import Path
 
 import pytest
@@ -12,7 +13,6 @@ async def tool(client, name, call_id, **args):
         f"/v1/retell/tools/{name}",
         json={"name": name, "call": {"call_id": call_id}, "args": args},
     )
-
 
 
 @pytest.fixture
@@ -52,9 +52,7 @@ def test_service_area_is_not_decided_by_language_model(demo_business, state, pos
 async def test_new_retell_tools_through_signed_backend_contract(harness):
     client, app, _ = harness
     business = app.state.business
-    object.__setattr__(
-        business, "approved_faqs", [{"question": "What hours are you open?", "answer": "Nine to five."}]
-    )
+    object.__setattr__(business, "approved_faqs", [{"question": "What hours are you open?", "answer": "Nine to five."}])
     found = await tool(client, "search_knowledge", "knowledge-call", question="What hours are you open?")
     assert found.json()["ok"] is True
     assert found.json()["data"]["matches"][0]["answer"] == "Nine to five."
