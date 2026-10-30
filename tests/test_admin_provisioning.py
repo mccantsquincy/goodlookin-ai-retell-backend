@@ -1,8 +1,7 @@
 """Calendar admin access is separate from the public receptionist and demo dashboard."""
+
 import base64
 import json
-from pathlib import Path
-
 import httpx
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -150,11 +149,11 @@ async def test_admin_provisions_only_after_confirmed_review_and_does_not_double_
             headers = {**auth(), "Origin": "http://test"}
             first = await client.post(ACTION, headers=headers, data=fields)
             assert first.status_code == 200
-            assert '"event_type_id": 655' in first.text
+            assert "&quot;event_type_id&quot;: 655" in first.text
             assert "Bookings remain disabled" in first.text
             second = await client.post(ACTION, headers=headers, data=fields)
             assert second.status_code == 200
-            assert '"event_action": "existing"' in second.text
+            assert "&quot;event_action&quot;: &quot;existing&quot;" in second.text
     assert posts == ["schedule", "event"]
 
 
