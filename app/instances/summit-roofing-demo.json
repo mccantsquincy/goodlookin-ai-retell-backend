@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "instance_key": "summit-roofing-demo",
+  "calendar_account_ref": "goodlookin-demo-account",
+  "company_name": "Summit Roofing (Fictional Demo)",
+  "event_title": "Summit Roofing — Roof Inspection (Demo)",
+  "event_slug": "gl-summit-roofing-demo-inspection",
+  "event_description": "Fictional roofing inspection consultation used only for Goodlookin AI demonstration. No actual contractor is dispatched.",
+  "event_length_minutes": 60,
+  "time_zone": "America/Phoenix",
+  "availability": [
+    {
+      "days": [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday"
+      ],
+      "start_time": "09:00",
+      "end_time": "17:00"
+    }
+  ],
+  "destination_calendar_ref": "Goodlookin Demo (existing Google Calendar — verify in Cal.com before booking)",
+  "approved": false,
+  "demo_only": true
+}
