@@ -3,6 +3,7 @@
 Hidden unless a separate, strong admin password is configured. No caller
 payloads, website content, API keys or arbitrary URLs are accepted.
 """
+
 import asyncio
 import hashlib
 import hmac
@@ -29,8 +30,7 @@ ADMIN_HEADERS = {
     "Referrer-Policy": "no-referrer",
     "X-Frame-Options": "DENY",
     "Content-Security-Policy": (
-        "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; "
-        "base-uri 'none'; frame-ancestors 'none'"
+        "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
     ),
 }
 

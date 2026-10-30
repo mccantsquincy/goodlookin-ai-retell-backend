@@ -106,12 +106,14 @@ async def test_rejects_csrf_origin_missing_approval_and_stale_draft(harness):
             )
             assert wrong_origin.status_code == 403
             no_approval = await client.post(
-                ACTION, headers={**auth(), "Origin": "http://test"},
+                ACTION,
+                headers={**auth(), "Origin": "http://test"},
                 data={**fields, "confirmation": "wrong"},
             )
             assert no_approval.status_code == 400
             stale_draft = await client.post(
-                ACTION, headers={**auth(), "Origin": "http://test"},
+                ACTION,
+                headers={**auth(), "Origin": "http://test"},
                 data={**fields, "draft_sha256": "0" * 64},
             )
             assert stale_draft.status_code == 400
