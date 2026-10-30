@@ -8,7 +8,7 @@ from sqlalchemy import DateTime, ForeignKey, String, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db import Base, Timestamps
+from app.db import Base, Lead, Timestamps
 
 ZONE = ZoneInfo("America/Phoenix")
 
@@ -49,7 +49,10 @@ class FakeCalendarReservation(Base, Timestamps):
 
 
 class CalendarAdapter(Protocol):
-    async def book(self, session: AsyncSession, operation_id: str, offer: SlotOffer) -> CalendarBooking: ...
+    async def available_slots(self, day: date, at: datetime) -> list[tuple[str, datetime, datetime]]: ...
+    async def book(
+        self, session: AsyncSession, operation_id: str, offer: SlotOffer, lead: Lead
+    ) -> CalendarBooking | None: ...
     async def lookup(self, session: AsyncSession, operation_id: str) -> CalendarBooking | None: ...
 
 
@@ -57,7 +60,10 @@ class FakeCalendar:
     def __init__(self) -> None:
         self.timeout_after_commit = False
 
-    async def book(self, session: AsyncSession, operation_id: str, offer: SlotOffer) -> CalendarBooking:
+    async def available_slots(self, day: date, at: datetime) -> list[tuple[str, datetime, datetime]]:
+        return proposed_slots(day, at)
+
+    async def book(self, session: AsyncSession, operation_id: str, offer: SlotOffer, lead: Lead) -> CalendarBooking:
         prior = await self.lookup(session, operation_id)
         if prior:
             return prior

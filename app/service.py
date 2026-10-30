@@ -9,13 +9,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.business import BusinessConfig, eligibility, missing_fields
+from app.calcom_calendar import CalendarUnavailable
 from app.calendar import (
     CalendarAdapter,
     CalendarCommittedTimeout,
     SlotOffer,
     SlotUnavailable,
     offer_expiration,
-    proposed_slots,
 )
 from app.contracts import (
     AvailabilityArgs,
@@ -68,7 +68,12 @@ async def check_eligibility(session: AsyncSession, call_id: str, args: LeadIdArg
 
 
 async def availability(
-    session: AsyncSession, call_id: str, args: AvailabilityArgs, config: BusinessConfig, at: datetime
+    session: AsyncSession,
+    call_id: str,
+    args: AvailabilityArgs,
+    config: BusinessConfig,
+    calendar: CalendarAdapter,
+    at: datetime,
 ) -> dict:
     lead = await owned_lead(session, call_id, args.lead_id)
     result = eligibility(lead, config)
@@ -77,7 +82,11 @@ async def availability(
     if not config.booking_enabled:
         raise BusinessFailure("BOOKING_DISABLED")
     slots = []
-    for slot_key, start, end in proposed_slots(args.preferred_date, at):
+    try:
+        available_slots = await calendar.available_slots(args.preferred_date, at)
+    except CalendarUnavailable:
+        raise BusinessFailure("CALENDAR_UNAVAILABLE") from None
+    for slot_key, start, end in available_slots:
         booked = await session.scalar(
             select(BookingOperation).where(
                 BookingOperation.slot_key == slot_key,
@@ -127,7 +136,10 @@ def booking_data(op: BookingOperation) -> dict:
 
 
 async def reconcile(session: AsyncSession, op: BookingOperation, calendar: CalendarAdapter) -> None:
-    reservation = await calendar.lookup(session, op.id)
+    try:
+        reservation = await calendar.lookup(session, op.id)
+    except CalendarUnavailable:
+        return  # retain pending status; do not claim confirmation
     if reservation and op.status != "confirmed":
         op.status = "confirmed"
         add_status_event(op, "confirmed")
@@ -171,6 +183,8 @@ async def book(
         if existing.status == "failed":
             raise BusinessFailure(existing.error_code or "BOOKING_FAILED", booking_data(existing))
         return booking_data(existing)
+    if getattr(calendar, "requires_contact_details", False) and (not lead.name or not lead.email):
+        raise BusinessFailure("BOOKING_CONTACT_DETAILS_REQUIRED")
     if eligibility(lead, config)["eligibility"] != "eligible":
         raise BusinessFailure("NOT_ELIGIBLE")
     if not config.booking_enabled:
@@ -204,8 +218,9 @@ async def book(
         await session.rollback()
         raise BusinessFailure("SLOT_UNAVAILABLE") from None
     try:
-        await calendar.book(session, op.id, offer)
-    except CalendarCommittedTimeout:
+        await calendar.book(session, op.id, offer, lead)
+    except (CalendarCommittedTimeout, CalendarUnavailable):
+        # Retain durable pending intent; never re-send an uncertain provider booking.
         return booking_data(op)
     except SlotUnavailable:
         op.status = "failed"
