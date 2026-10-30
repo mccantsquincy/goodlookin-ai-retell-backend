@@ -5,6 +5,8 @@ import pytest
 
 from app.business import BusinessConfig
 from app.knowledge import search_knowledge, service_area_check
+
+
 async def tool(client, name, call_id, **args):
     return await client.post(
         f"/v1/retell/tools/{name}",
