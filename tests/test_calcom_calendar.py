@@ -33,11 +33,7 @@ def make_provider(day, *, conflict=False, timeout=False):
                 200,
                 json={
                     "status": "success",
-                    "data": {
-                        day.isoformat(): [
-                            {"start": start.isoformat(), "end": end.isoformat()}
-                        ]
-                    },
+                    "data": {day.isoformat(): [{"start": start.isoformat(), "end": end.isoformat()}]},
                 },
             )
         if request.url.path == "/v2/bookings" and request.method == "GET":
@@ -104,9 +100,7 @@ async def setup_lead(client, call_id, *, include_email=True):
     }
     if include_email:
         data["email"] = "demo@example.com"
-    response = await client.post(
-        "/v1/retell/tools/save_lead", json=endpoint_payload("save_lead", call_id, **data)
-    )
+    response = await client.post("/v1/retell/tools/save_lead", json=endpoint_payload("save_lead", call_id, **data))
     assert response.json()["ok"] is True
     return response.json()["data"]["lead_id"]
 
@@ -133,8 +127,7 @@ async def test_live_slots_and_confirmed_booking_are_idempotent(harness):
         booking = await client.post(
             "/v1/retell/tools/book_appointment",
             json=endpoint_payload(
-                "book_appointment", "calcom-demo", lead_id=lead_id,
-                slot_id=slots[0]["slot_id"], caller_confirmed=True
+                "book_appointment", "calcom-demo", lead_id=lead_id, slot_id=slots[0]["slot_id"], caller_confirmed=True
             ),
         )
         assert booking.json()["ok"] is True
@@ -144,8 +137,7 @@ async def test_live_slots_and_confirmed_booking_are_idempotent(harness):
         repeat = await client.post(
             "/v1/retell/tools/book_appointment",
             json=endpoint_payload(
-                "book_appointment", "calcom-demo", lead_id=lead_id,
-                slot_id=slots[0]["slot_id"], caller_confirmed=True
+                "book_appointment", "calcom-demo", lead_id=lead_id, slot_id=slots[0]["slot_id"], caller_confirmed=True
             ),
         )
         assert repeat.json()["data"]["status"] == "confirmed"
@@ -170,9 +162,7 @@ async def test_conflict_returns_slot_unavailable(harness):
         slot = available.json()["data"]["slots"][0]["slot_id"]
         response = await client.post(
             "/v1/retell/tools/book_appointment",
-            json=endpoint_payload(
-                "book_appointment", "conflict", lead_id=lead_id, slot_id=slot, caller_confirmed=True
-            ),
+            json=endpoint_payload("book_appointment", "conflict", lead_id=lead_id, slot_id=slot, caller_confirmed=True),
         )
         assert response.json()["code"] == "SLOT_UNAVAILABLE"
     await provider.client.aclose()
@@ -195,16 +185,12 @@ async def test_ambiguous_provider_timeout_is_pending_and_not_reposted(harness):
         slot = available.json()["data"]["slots"][0]["slot_id"]
         booking = await client.post(
             "/v1/retell/tools/book_appointment",
-            json=endpoint_payload(
-                "book_appointment", "timeout", lead_id=lead_id, slot_id=slot, caller_confirmed=True
-            ),
+            json=endpoint_payload("book_appointment", "timeout", lead_id=lead_id, slot_id=slot, caller_confirmed=True),
         )
         assert booking.json()["data"]["status"] == "pending"
         repeat = await client.post(
             "/v1/retell/tools/book_appointment",
-            json=endpoint_payload(
-                "book_appointment", "timeout", lead_id=lead_id, slot_id=slot, caller_confirmed=True
-            ),
+            json=endpoint_payload("book_appointment", "timeout", lead_id=lead_id, slot_id=slot, caller_confirmed=True),
         )
         assert repeat.json()["data"]["status"] == "pending"
         assert len([x for x in calls if x[0] == "POST"]) == 1
@@ -228,9 +214,7 @@ async def test_missing_email_is_refused_before_booking_post(harness):
         slot = available.json()["data"]["slots"][0]["slot_id"]
         booking = await client.post(
             "/v1/retell/tools/book_appointment",
-            json=endpoint_payload(
-                "book_appointment", "no-email", lead_id=lead_id, slot_id=slot, caller_confirmed=True
-            ),
+            json=endpoint_payload("book_appointment", "no-email", lead_id=lead_id, slot_id=slot, caller_confirmed=True),
         )
         assert booking.json()["code"] == "BOOKING_CONTACT_DETAILS_REQUIRED"
         assert not [item for item in calls if item[0] == "POST"]
@@ -240,6 +224,9 @@ async def test_missing_email_is_refused_before_booking_post(harness):
 def test_calcom_config_requires_opt_in_credentials():
     with pytest.raises(ValueError, match="CALCOM_API_KEY"):
         Settings(
-            app_env="test", database_url="sqlite+aiosqlite:///:memory:",
-            calendar_provider="calcom", calcom_api_key=SecretStr(""), calcom_event_type_id=None
+            app_env="test",
+            database_url="sqlite+aiosqlite:///:memory:",
+            calendar_provider="calcom",
+            calcom_api_key=SecretStr(""),
+            calcom_event_type_id=None,
         )

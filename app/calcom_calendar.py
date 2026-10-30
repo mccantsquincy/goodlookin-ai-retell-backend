@@ -27,18 +27,14 @@ class CalendarUnavailable(Exception):
 class CalComCalendar:
     requires_contact_details = True
 
-    def __init__(
-        self, api_key: str, event_type_id: int, client: httpx.AsyncClient | None = None
-    ) -> None:
+    def __init__(self, api_key: str, event_type_id: int, client: httpx.AsyncClient | None = None) -> None:
         if not api_key or event_type_id < 1:
             raise ValueError("A Cal.com API key and event type ID are required")
         self.api_key = api_key
         self.event_type_id = event_type_id
         self.client = client
 
-    async def _request(
-        self, method: str, path: str, version: str, **kwargs: object
-    ) -> dict:
+    async def _request(self, method: str, path: str, version: str, **kwargs: object) -> dict:
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "cal-api-version": version,
@@ -137,9 +133,9 @@ class CalComCalendar:
         if op is None:
             return None
         if op.booking_id:
-            record = (
-                await self._request("GET", f"/v2/bookings/{op.booking_id}", GET_BOOKING_API_VERSION)
-            ).get("data", {})
+            record = (await self._request("GET", f"/v2/bookings/{op.booking_id}", GET_BOOKING_API_VERSION)).get(
+                "data", {}
+            )
         else:
             record = await self._find_existing(session, operation_id)
         if record is None:
