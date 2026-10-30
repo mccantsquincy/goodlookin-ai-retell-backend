@@ -114,6 +114,6 @@ async def test_uncertain_create_is_not_retried():
 
     async with httpx.AsyncClient(base_url="https://api.cal.com", transport=httpx.MockTransport(handler)) as c:
         p = CalComProvisioner("fake-key", "2024-06-11", "2024-06-14", c)
-        with pytest.raises(ProvisioningError, match="outcome is uncertain"):
+        with pytest.raises(ProvisioningError, match="outcome uncertain"):
             await p.apply(settings, settings.instance_key)
         assert calls == ["GET", "POST"]
