@@ -132,3 +132,10 @@ See [Engineering Notes #06](docs/engineering-notes-06-calcom-booking.md). The ad
 uses a dedicated demo Cal.com event type to fetch authoritative slots and create confirmed bookings.
 Keep `CALENDAR_PROVIDER=fake` and `booking_enabled=false` in staging until a separate demo account,
 its required attendee fields, and Retell test flow are configured and verified.
+
+## Secure browser-based demo calendar provisioning
+
+See [Engineering Notes #08](docs/engineering-notes-08-admin-calendar.md). This staging-only console at
+`/admin/calendar` stays inaccessible until a unique 32+-character
+`PROVISIONING_ADMIN_PASSWORD` is set on the API service. It uses the already configured
+Cal.com provisioning key and endpoint versions, and **does not** turn on bookings.
