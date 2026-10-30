@@ -8,7 +8,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from pydantic import SecretStr
 
-from app.calcom_calendar import CalComCalendar, CalendarUnavailable
+from app.calcom_calendar import CalComCalendar
 from app.config import Settings
 from app.main import create_app
 

@@ -13,8 +13,8 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.business import BusinessConfig
-from app.calendar import CalendarAdapter, FakeCalendar
 from app.calcom_calendar import CalComCalendar
+from app.calendar import CalendarAdapter, FakeCalendar
 from app.config import Settings
 from app.contracts import ARG_MODELS, ToolRequest, ToolResponse
 from app.crm import CRMAdapter, LocalCRM

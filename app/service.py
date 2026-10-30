@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.business import BusinessConfig, eligibility, missing_fields
+from app.calcom_calendar import CalendarUnavailable
 from app.calendar import (
     CalendarAdapter,
     CalendarCommittedTimeout,
@@ -16,7 +17,6 @@ from app.calendar import (
     SlotUnavailable,
     offer_expiration,
 )
-from app.calcom_calendar import CalendarUnavailable
 from app.contracts import (
     AvailabilityArgs,
     BookArgs,
@@ -68,7 +68,12 @@ async def check_eligibility(session: AsyncSession, call_id: str, args: LeadIdArg
 
 
 async def availability(
-    session: AsyncSession, call_id: str, args: AvailabilityArgs, config: BusinessConfig, calendar: CalendarAdapter, at: datetime
+    session: AsyncSession,
+    call_id: str,
+    args: AvailabilityArgs,
+    config: BusinessConfig,
+    calendar: CalendarAdapter,
+    at: datetime,
 ) -> dict:
     lead = await owned_lead(session, call_id, args.lead_id)
     result = eligibility(lead, config)
