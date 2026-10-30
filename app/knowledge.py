@@ -3,6 +3,7 @@
 This is retrieval, not generative RAG yet: an LLM in Retell may phrase the
 retrieved approved answer, but it must not invent missing business facts.
 """
+
 import re
 
 from app.business import BusinessConfig
