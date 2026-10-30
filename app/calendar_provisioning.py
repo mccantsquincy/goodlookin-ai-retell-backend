@@ -131,7 +131,7 @@ class CalComProvisioner:
                 json=payload,
             )
         except httpx.RequestError as exc:
-            raise ProvisioningError("Cal.com request outcome is uncertain; inspect remote resources before retry") from exc
+            raise ProvisioningError("Cal.com request outcome uncertain; inspect remote resources before retry") from exc
         if not 200 <= response.status_code < 300:
             raise ProvisioningError(f"Cal.com {method} {path} returned HTTP {response.status_code}; no automatic retry")
         try:
