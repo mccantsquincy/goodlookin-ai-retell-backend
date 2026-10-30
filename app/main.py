@@ -6,12 +6,14 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from uuid import uuid4
 
+import httpx
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.admin_provisioning import build_admin_provisioning_router
 from app.business import BusinessConfig
 from app.calcom_calendar import CalComCalendar
 from app.calendar import CalendarAdapter, FakeCalendar
@@ -41,6 +43,7 @@ def create_app(
     business: BusinessConfig | None = None,
     calendar: CalendarAdapter | None = None,
     crm: CRMAdapter | None = None,
+    provisioning_client: httpx.AsyncClient | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
     if business is None:
@@ -73,6 +76,7 @@ def create_app(
     app.state.crm = crm
     app.state.sessions = sessions
     app.include_router(build_dashboard_router(settings, sessions))
+    app.include_router(build_admin_provisioning_router(settings, provisioning_client))
 
     async def database_session() -> AsyncIterator[AsyncSession]:
         async with sessions() as session:
