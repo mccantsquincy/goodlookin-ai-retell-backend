@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.business import BusinessConfig
 from app.calendar import CalendarAdapter, FakeCalendar
+from app.calcom_calendar import CalComCalendar
 from app.config import Settings
 from app.contracts import ARG_MODELS, ToolRequest, ToolResponse
 from app.crm import CRMAdapter, LocalCRM
@@ -49,7 +50,12 @@ def create_app(
                 raise ValueError("Business configuration is required in production")
             config_path = Path(__file__).with_name("business.local.example.json")
         business = BusinessConfig.load(config_path)
-    calendar = calendar or FakeCalendar()
+    if calendar is None:
+        calendar = (
+            CalComCalendar(settings.calcom_api_key.get_secret_value(), settings.calcom_event_type_id)
+            if settings.calendar_provider == "calcom"
+            else FakeCalendar()
+        )
     crm = crm or LocalCRM()
     if settings.app_env == "production" and (isinstance(calendar, FakeCalendar) or isinstance(crm, LocalCRM)):
         raise ValueError("Production calendar and CRM adapters are required")
@@ -118,7 +124,7 @@ def create_app(
                 elif name == "get_available_appointments":
                     from app.db import now
 
-                    data = await availability(session, call_id, args, business, now())
+                    data = await availability(session, call_id, args, business, calendar, now())
                 elif name == "book_appointment":
                     from app.db import now
 

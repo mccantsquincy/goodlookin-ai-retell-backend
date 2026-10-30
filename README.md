@@ -125,3 +125,10 @@ are configured. It shows anonymous counts and call states, **not contact
 information, real bookings or delivered office notifications**. See
 [Engineering Notes #03](docs/engineering-notes-03-demo-operations.md) for setup,
 security boundaries and the next demo-to-pilot milestones.
+
+## Optional Cal.com calendar-backed demo
+
+See [Engineering Notes #06](docs/engineering-notes-06-calcom-booking.md). The adapter is opt-in and
+uses a dedicated demo Cal.com event type to fetch authoritative slots and create confirmed bookings.
+Keep `CALENDAR_PROVIDER=fake` and `booking_enabled=false` in staging until a separate demo account,
+its required attendee fields, and Retell test flow are configured and verified.
