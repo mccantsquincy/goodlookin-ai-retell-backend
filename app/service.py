@@ -214,7 +214,8 @@ async def book(
         raise BusinessFailure("SLOT_UNAVAILABLE") from None
     try:
         await calendar.book(session, op.id, offer, lead)
-    except CalendarCommittedTimeout:
+    except (CalendarCommittedTimeout, CalendarUnavailable):
+        # Retain durable pending intent; never re-send an uncertain provider booking.
         return booking_data(op)
     except SlotUnavailable:
         op.status = "failed"

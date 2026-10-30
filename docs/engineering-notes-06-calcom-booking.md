@@ -61,6 +61,7 @@ Cal.com's API documentation uses **different required version headers by endpoin
 - GET /v2/slots: `2024-09-04`
 - POST /v2/bookings: `2026-02-25`
 - GET /v2/bookings: `2026-05-01`
+- GET /v2/bookings/{uid}: `2026-02-25`
 
 Docs: https://cal.com/docs/api-reference/v2/slots/get-available-time-slots-for-an-event-type
 and https://cal.com/docs/api-reference/v2/bookings/create-a-booking

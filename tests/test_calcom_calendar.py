@@ -70,7 +70,7 @@ def make_provider(day, *, conflict=False, timeout=False):
                 },
             )
         if request.url.path == "/v2/bookings/demo-booking-123":
-            assert request.headers["cal-api-version"] == "2026-05-01"
+            assert request.headers["cal-api-version"] == "2026-02-25"
             return httpx.Response(
                 200,
                 json={

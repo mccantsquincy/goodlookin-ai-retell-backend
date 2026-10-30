@@ -17,6 +17,7 @@ ZONE = ZoneInfo("America/Phoenix")
 SLOTS_API_VERSION = "2024-09-04"
 CREATE_API_VERSION = "2026-02-25"
 LIST_API_VERSION = "2026-05-01"
+GET_BOOKING_API_VERSION = "2026-02-25"
 
 
 class CalendarUnavailable(Exception):
@@ -137,7 +138,7 @@ class CalComCalendar:
             return None
         if op.booking_id:
             record = (
-                await self._request("GET", f"/v2/bookings/{op.booking_id}", LIST_API_VERSION)
+                await self._request("GET", f"/v2/bookings/{op.booking_id}", GET_BOOKING_API_VERSION)
             ).get("data", {})
         else:
             record = await self._find_existing(session, operation_id)
@@ -162,7 +163,10 @@ class CalComCalendar:
                 "/v2/bookings",
                 CREATE_API_VERSION,
                 json={
-                    "start": offer.starts_at.astimezone(UTC).isoformat().replace("+00:00", "Z"),
+                    "start": (offer.starts_at.replace(tzinfo=ZONE) if offer.starts_at.tzinfo is None else offer.starts_at)
+                    .astimezone(UTC)
+                    .isoformat()
+                    .replace("+00:00", "Z"),
                     "eventTypeId": self.event_type_id,
                     "attendee": {
                         "name": lead.name,
