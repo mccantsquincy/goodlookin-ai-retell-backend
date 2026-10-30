@@ -15,8 +15,8 @@ from app.main import create_app
 ZONE = ZoneInfo("America/Phoenix")
 
 
-def endpoint_payload(name, call_id, **args):
-    return {"name": name, "call": {"call_id": call_id}, "args": args}
+def endpoint_payload(tool_name, call_id, **args):
+    return {"name": tool_name, "call": {"call_id": call_id}, "args": args}
 
 
 def make_provider(day, *, conflict=False, timeout=False):
