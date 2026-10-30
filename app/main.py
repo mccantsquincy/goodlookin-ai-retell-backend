@@ -19,6 +19,7 @@ from app.contracts import ARG_MODELS, ToolRequest, ToolResponse
 from app.crm import CRMAdapter, LocalCRM
 from app.db import get_session, session_factory
 from app.demo_dashboard import build_dashboard_router
+from app.knowledge import search_knowledge, service_area_check
 from app.security import verified_body
 from app.service import (
     BusinessFailure,
@@ -106,6 +107,10 @@ def create_app(
                     from app.db import now
 
                     data = business.context(now())
+                elif name == "search_knowledge":
+                    data = search_knowledge(business, args.question)
+                elif name == "check_service_area":
+                    data = service_area_check(business, args.state, args.postal_code, args.service_type)
                 elif name == "save_lead":
                     data = await save_lead(session, call_id, args, crm)
                 elif name == "check_service_eligibility":

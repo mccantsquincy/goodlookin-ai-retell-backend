@@ -28,6 +28,16 @@ class ToolResponse(BaseModel):
     request_id: str
 
 
+class SearchKnowledgeArgs(StrictModel):
+    question: str = Field(min_length=2, max_length=500)
+
+
+class ServiceAreaArgs(StrictModel):
+    state: str = Field(min_length=2, max_length=40)
+    postal_code: str = Field(min_length=1, max_length=10)
+    service_type: str | None = Field(default=None, max_length=120)
+
+
 class EmptyArgs(StrictModel):
     pass
 
@@ -73,6 +83,8 @@ class CallbackArgs(LeadIdArgs):
 
 ARG_MODELS = {
     "get_business_context": EmptyArgs,
+    "search_knowledge": SearchKnowledgeArgs,
+    "check_service_area": ServiceAreaArgs,
     "save_lead": SaveLeadArgs,
     "check_service_eligibility": LeadIdArgs,
     "get_available_appointments": AvailabilityArgs,
