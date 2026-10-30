@@ -157,16 +157,14 @@ class CalComCalendar:
             return existing
         if not lead.name or not lead.email:
             raise ValueError("Contact name and email required")
+        start_at = offer.starts_at.replace(tzinfo=ZONE) if offer.starts_at.tzinfo is None else offer.starts_at
         try:
             payload = await self._request(
                 "POST",
                 "/v2/bookings",
                 CREATE_API_VERSION,
                 json={
-                    "start": (offer.starts_at.replace(tzinfo=ZONE) if offer.starts_at.tzinfo is None else offer.starts_at)
-                    .astimezone(UTC)
-                    .isoformat()
-                    .replace("+00:00", "Z"),
+                    "start": start_at.astimezone(UTC).isoformat().replace("+00:00", "Z"),
                     "eventTypeId": self.event_type_id,
                     "attendee": {
                         "name": lead.name,
