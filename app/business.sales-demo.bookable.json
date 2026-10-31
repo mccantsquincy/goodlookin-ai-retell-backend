@@ -1,0 +1,59 @@
+{
+  "company_name": "Summit Roofing (Fictional Demo)",
+  "business_hours": {
+    "monday": "09:00–17:00",
+    "tuesday": "09:00–17:00",
+    "wednesday": "09:00–17:00",
+    "thursday": "09:00–17:00",
+    "friday": "09:00–17:00"
+  },
+  "services": [
+    "Roof inspections",
+    "Leak assessments",
+    "Roof replacement consultations"
+  ],
+  "approved_faqs": [
+    {
+      "question": "What areas do you serve?",
+      "answer": "For this fictional demo, approved coverage includes ZIP codes 85001, 85002, 85003, 85004 and 85251 in Arizona. Ask for the caller's ZIP code and use check_service_area to verify their specific location."
+    },
+    {
+      "question": "Do you offer free inspections?",
+      "answer": "For this fictional demo, initial roof inspections are complimentary. This is not an offer from a real roofing contractor."
+    },
+    {
+      "question": "What are your business hours?",
+      "answer": "The fictional office is open Monday to Friday from 9 AM to 5 PM Arizona time."
+    },
+    {
+      "question": "Do you provide emergency services?",
+      "answer": "The demo cannot promise emergency dispatch. For active dangers, advise callers to get to safety and contact emergency services. Offer an office callback for non-emergency follow-up."
+    },
+    {
+      "question": "How much does a new roof cost?",
+      "answer": "Prices depend on site conditions, materials and scope. The demo cannot give a binding quote; an inspection and written estimate are required."
+    },
+    {
+      "question": "Can you book an inspection?",
+      "answer": "The demo can only offer available inspection slots returned by the calendar backend. Never promise a confirmed appointment until book_appointment returns confirmed."
+    }
+  ],
+  "booking_enabled": true,
+  "transfer_available": false,
+  "transfer_phone_number": null,
+  "callback_expectation": "This is a simulated demonstration. The office has not been notified and the callback request is stored for testing.",
+  "eligible_states": [
+    "AZ"
+  ],
+  "eligible_postal_codes": [
+    "85001",
+    "85002",
+    "85003",
+    "85004",
+    "85251"
+  ],
+  "eligible_services": [
+    "inspection"
+  ],
+  "appointment_type": "inspection"
+}

@@ -139,3 +139,9 @@ See [Engineering Notes #08](docs/engineering-notes-08-admin-calendar.md). This s
 `/admin/calendar` stays inaccessible until a unique 32+-character
 `PROVISIONING_ADMIN_PASSWORD` is set on the API service. It uses the already configured
 Cal.com provisioning key and endpoint versions, and **does not** turn on bookings.
+
+## Summit Roofing external booking activation
+
+See [Engineering Notes #09](docs/engineering-notes-09-summit-booking-activation.md).
+The default fictional business profile leaves booking disabled. Use the separately reviewed
+`app/business.sales-demo.bookable.json` **only in staging** for a controlled Cal.com booking test.
