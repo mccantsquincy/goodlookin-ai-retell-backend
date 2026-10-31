@@ -82,9 +82,7 @@ async def dashboard_data(session: AsyncSession) -> tuple[dict[str, int], list[di
     return counts, rows
 
 
-def dashboard_html(
-    counts: dict[str, int], rows: list[dict[str, str | bool]], calendar_provider: str = "fake"
-) -> str:
+def dashboard_html(counts: dict[str, int], rows: list[dict[str, str | bool]], calendar_provider: str = "fake") -> str:
     """Render server-side HTML; label historical simulated and new bookings accurately."""
     external = calendar_provider == "calcom"
     appointment_label = "Appointment records (mixed history)" if external else "Simulated appointments"
