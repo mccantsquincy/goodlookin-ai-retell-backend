@@ -99,12 +99,20 @@ async def test_rejects_csrf_origin_missing_approval_and_stale_draft(harness):
         async with AsyncClient(transport=ASGITransport(app=api), base_url="http://test") as client:
             review = await client.get(PATH, headers=auth())
             fields = extract_form_values(review.text)
-            no_origin = await client.post(ACTION, headers=auth(), data=fields)
-            assert no_origin.status_code == 403
+            no_origin_with_bad_csrf = await client.post(
+                ACTION, headers=auth(), data={**fields, "csrf_token": "invalid"}
+            )
+            assert no_origin_with_bad_csrf.status_code == 400
             wrong_origin = await client.post(
                 ACTION, headers={**auth(), "Origin": "http://attacker.invalid"}, data=fields
             )
             assert wrong_origin.status_code == 403
+            null_origin = await client.post(ACTION, headers={**auth(), "Origin": "null"}, data=fields)
+            assert null_origin.status_code == 403
+            cross_site = await client.post(ACTION, headers={**auth(), "Sec-Fetch-Site": "cross-site"}, data=fields)
+            assert cross_site.status_code == 403
+            same_site = await client.post(ACTION, headers={**auth(), "Sec-Fetch-Site": "same-site"}, data=fields)
+            assert same_site.status_code == 403
             no_approval = await client.post(
                 ACTION,
                 headers={**auth(), "Origin": "http://test"},
@@ -149,12 +157,14 @@ async def test_admin_provisions_only_after_confirmed_review_and_does_not_double_
         async with AsyncClient(transport=ASGITransport(app=api), base_url="http://test") as client:
             review = await client.get(PATH, headers=auth())
             fields = extract_form_values(review.text)
-            headers = {**auth(), "Origin": "http://test"}
+            # Browser privacy settings may omit Origin entirely. Its reviewed,
+            # HMAC-signed form still works and cannot be forged cross-site.
+            headers = {**auth(), "Sec-Fetch-Site": "same-origin"}
             first = await client.post(ACTION, headers=headers, data=fields)
             assert first.status_code == 200
             assert "&quot;event_type_id&quot;: 655" in first.text
             assert "Bookings remain disabled" in first.text
-            second = await client.post(ACTION, headers=headers, data=fields)
+            second = await client.post(ACTION, headers={**auth(), "Origin": "http://test"}, data=fields)
             assert second.status_code == 200
             assert "&quot;event_action&quot;: &quot;existing&quot;" in second.text
     assert posts == ["schedule", "event"]
@@ -185,3 +195,35 @@ async def test_no_admin_secret_reflected_in_error_response(harness):
             assert "could not be verified" in response.text
             assert "private data" not in response.text
             assert "mock-api-token" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_trusted_railway_origin_accepts_public_browser_origin_with_private_proxy_host(harness):
+    api = build_app(harness)
+    api.state.settings.provisioning_admin_origin = "https://api-staging-dce8.up.railway.app"
+    async with AsyncClient(transport=ASGITransport(app=api), base_url="http://private-proxy.internal") as client:
+        review = await client.get(PATH, headers=auth())
+        fields = extract_form_values(review.text)
+        # Valid public Origin must get past origin-check to the (intentionally
+        # invalid) signed draft validation, rather than produce a 403.
+        valid_public_origin = await client.post(
+            ACTION,
+            headers={**auth(), "Origin": "https://api-staging-dce8.up.railway.app"},
+            data={**fields, "csrf_token": "incorrect"},
+        )
+        assert valid_public_origin.status_code == 400
+        foreign_origin = await client.post(
+            ACTION,
+            headers={**auth(), "Origin": "https://attacker.example"},
+            data=fields,
+        )
+        assert foreign_origin.status_code == 403
+
+
+def test_rejects_invalid_provisioning_admin_origin():
+    with pytest.raises(ValueError, match="exact HTTPS origin"):
+        Settings(
+            app_env="test",
+            database_url="sqlite+aiosqlite:///:memory:",
+            provisioning_admin_origin="https://attacker.example/callback",
+        )

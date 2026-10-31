@@ -39,3 +39,19 @@ Why is it unsafe to use the existing read-only dashboard password for a route th
 ## Next verification
 
 After successful creation, wire the numeric ID into `CALCOM_EVENT_TYPE_ID`, use a demo-only booking key in `CALCOM_API_KEY`, confirm Google destination, then enable the fictional booking flow **only after** an actual end-to-end Retell test. New calendar event types are NOT automatically fully functional customer agents.
+
+## Origin validation fix (PR #9)
+
+A staging submission returned `{"detail":"Origin not allowed"}` before the Cal.com adapter was invoked. HTTP logs confirmed `GET /admin/calendar` succeeded while `POST /admin/calendar/provision` returned 403.
+
+The original check required an `Origin` header on **every** browser form POST. Some browser/privacy/proxy combinations omit it. The corrected policy:
+
+- If `Origin` is provided, it **must exactly match** the same HTTPS host (or HTTP in isolated tests).
+- Explicitly foreign, `null`, cross-site and same-site requests remain rejected.
+- An omitted `Origin` is accepted **only if** authentication, the password-bound HMAC approval token, draft fingerprint, checkbox and exact typed phrase are all valid; this retains the application's CSRF protection.
+- No secret values or caller data are logged; no scheduling resources are created by this fix.
+- Tests cover absent Origin, allowed same-origin Fetch Metadata, rejected foreign/null/cross-site, and replay-safe Cal.com resource discovery.
+
+This does not create a public provisioning API or relax the dedicated administrator password requirement.
+
+**Reverse proxy note:** Staging sets `PROVISIONING_ADMIN_ORIGIN=https://api-staging-dce8.up.railway.app` to compare browser Origin against the configured public domain rather than potentially internal proxy Host headers. An explicit foreign Origin is always rejected.
