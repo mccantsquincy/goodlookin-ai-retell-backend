@@ -82,15 +82,26 @@ async def dashboard_data(session: AsyncSession) -> tuple[dict[str, int], list[di
     return counts, rows
 
 
-def dashboard_html(counts: dict[str, int], rows: list[dict[str, str | bool]]) -> str:
-    """Render server-side HTML; escape all variable content."""
+def dashboard_html(
+    counts: dict[str, int], rows: list[dict[str, str | bool]], calendar_provider: str = "fake"
+) -> str:
+    """Render server-side HTML; label historical simulated and new bookings accurately."""
+    external = calendar_provider == "calcom"
+    appointment_label = "Appointment records (mixed history)" if external else "Simulated appointments"
+    booking_label = "Recorded" if external else "Simulated"
+    provider_note = (
+        "Appointment records can contain historical simulated tests. Verify actual external bookings in Cal.com "
+        "and the Goodlookin Demo Google Calendar before making confirmation claims."
+        if external
+        else "All appointments shown here are simulated, not external calendar bookings."
+    )
     cards = "".join(
         f'<article class="stat"><div class="number">{counts[name]}</div><div class="label">{label}</div></article>'
         for name, label in (
             ("calls", "Recorded calls"),
             ("leads", "Saved leads"),
             ("callbacks", "Callback requests queued"),
-            ("appointments", "Simulated appointments"),
+            ("appointments", appointment_label),
         )
     )
     table_rows = (
@@ -101,7 +112,7 @@ def dashboard_html(counts: dict[str, int], rows: list[dict[str, str | bool]]) ->
             f"<td>{escape(str(item['status']))}</td>"
             f"<td>{'Saved' if item['lead'] else '—'}</td>"
             f"<td>{'Queued' if item['callback'] else '—'}</td>"
-            f"<td>{'Simulated' if item['simulated_booking'] else '—'}</td>"
+            f"<td>{booking_label if item['simulated_booking'] else '—'}</td>"
             "</tr>"
             for item in rows
         )
@@ -129,7 +140,7 @@ footer{{margin-top:26px;color:#aeb2bc;font-size:13px}}
 <p>Read-only snapshot of the current database. No caller names, phone numbers, addresses or transcripts.</p>
 <div class="grid">{cards}</div>
 <div class="note"><strong>Important:</strong> Queued callbacks are stored, <em>not delivered</em> to the office.
-All appointments shown here are <em>simulated</em>, not external calendar bookings.</div>
+{provider_note}</div>
 <h2>Recent activity</h2><section><table><thead><tr><th>Anonymous reference</th><th>First recorded (UTC)</th>
 <th>Call state</th><th>Lead</th><th>Callback</th><th>Booking</th></tr></thead>
 <tbody>{table_rows}</tbody></table></section>
@@ -153,6 +164,6 @@ def build_dashboard_router(settings: Settings, sessions: async_sessionmaker[Asyn
             )
         async with sessions() as session:
             counts, rows = await dashboard_data(session)
-        return HTMLResponse(content=dashboard_html(counts, rows), headers=HEADERS)
+        return HTMLResponse(content=dashboard_html(counts, rows, settings.calendar_provider), headers=HEADERS)
 
     return router
