@@ -107,17 +107,11 @@ async def test_rejects_csrf_origin_missing_approval_and_stale_draft(harness):
                 ACTION, headers={**auth(), "Origin": "http://attacker.invalid"}, data=fields
             )
             assert wrong_origin.status_code == 403
-            null_origin = await client.post(
-                ACTION, headers={**auth(), "Origin": "null"}, data=fields
-            )
+            null_origin = await client.post(ACTION, headers={**auth(), "Origin": "null"}, data=fields)
             assert null_origin.status_code == 403
-            cross_site = await client.post(
-                ACTION, headers={**auth(), "Sec-Fetch-Site": "cross-site"}, data=fields
-            )
+            cross_site = await client.post(ACTION, headers={**auth(), "Sec-Fetch-Site": "cross-site"}, data=fields)
             assert cross_site.status_code == 403
-            same_site = await client.post(
-                ACTION, headers={**auth(), "Sec-Fetch-Site": "same-site"}, data=fields
-            )
+            same_site = await client.post(ACTION, headers={**auth(), "Sec-Fetch-Site": "same-site"}, data=fields)
             assert same_site.status_code == 403
             no_approval = await client.post(
                 ACTION,
@@ -170,9 +164,7 @@ async def test_admin_provisions_only_after_confirmed_review_and_does_not_double_
             assert first.status_code == 200
             assert "&quot;event_type_id&quot;: 655" in first.text
             assert "Bookings remain disabled" in first.text
-            second = await client.post(
-                ACTION, headers={**auth(), "Origin": "http://test"}, data=fields
-            )
+            second = await client.post(ACTION, headers={**auth(), "Origin": "http://test"}, data=fields)
             assert second.status_code == 200
             assert "&quot;event_action&quot;: &quot;existing&quot;" in second.text
     assert posts == ["schedule", "event"]
