@@ -110,9 +110,7 @@ async def test_forged_cross_site_form_lacks_required_session_cookie(harness):
         async with AsyncClient(transport=transport, base_url="http://test") as browser:
             review = await browser.get(PATH, headers=auth())
             fields = form_data(review.text)
-            missing_confirmation = await browser.post(
-                ACTION, headers=auth(), data={**fields, "confirmation": "WRONG"}
-            )
+            missing_confirmation = await browser.post(ACTION, headers=auth(), data={**fields, "confirmation": "WRONG"})
             assert missing_confirmation.status_code == 400
             invalid_signature = await browser.post(ACTION, headers=auth(), data={**fields, "csrf_token": "bad"})
             assert invalid_signature.status_code == 400
