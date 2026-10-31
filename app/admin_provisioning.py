@@ -8,6 +8,8 @@ import asyncio
 import hashlib
 import hmac
 import json
+import secrets
+import time
 from html import escape
 from pathlib import Path
 from urllib.parse import parse_qs
@@ -23,6 +25,8 @@ from app.demo_dashboard import valid_basic_auth
 INSTANCE_PATH = Path(__file__).parent / "instances" / "summit-roofing-demo.json"
 ADMIN_PATH = "/admin/calendar"
 FORM_ACTION = "/admin/calendar/provision"
+CSRF_COOKIE = "gl_calendar_approval"
+CSRF_MAX_AGE = 900
 ADMIN_HEADERS = {
     "Cache-Control": "no-store",
     "Pragma": "no-cache",
@@ -61,9 +65,25 @@ def _load() -> tuple[ClientCalendarDraft, str]:
     return ClientCalendarDraft.model_validate_json(raw), hashlib.sha256(raw).hexdigest()
 
 
-def _csrf(admin_password: str, digest: str, key: str) -> str:
-    message = f"provision-demo:v1:{digest}:{key}".encode()
+def _csrf(admin_password: str, digest: str, key: str, session_nonce: str) -> str:
+    message = f"provision-demo:v2:{digest}:{key}:{session_nonce}".encode()
     return hmac.new(admin_password.encode(), message, hashlib.sha256).hexdigest()
+
+
+def _new_session_nonce() -> str:
+    return f"{int(time.time())}.{secrets.token_hex(32)}"
+
+
+def _valid_session_nonce(raw: str | None) -> bool:
+    if not raw or len(raw) > 100:
+        return False
+    issued, sep, token = raw.partition(".")
+    if not sep or len(issued) != 10 or not issued.isdecimal() or len(token) != 64:
+        return False
+    if any(ch not in "0123456789abcdef" for ch in token):
+        return False
+    age = time.time() - int(issued)
+    return -60 <= age <= CSRF_MAX_AGE
 
 
 def build_admin_provisioning_router(
@@ -97,8 +117,9 @@ def build_admin_provisioning_router(
         preview = json.dumps(draft.preview(), indent=2, ensure_ascii=True)
         safe_preview = escape(preview)
         phrase = f"PROVISION {draft.instance_key}"
-        csrf = _csrf(auth, digest, draft.instance_key)
-        return _page(
+        nonce = _new_session_nonce()
+        csrf = _csrf(auth, digest, draft.instance_key, nonce)
+        page = _page(
             "Review calendar provisioning",
             f"""<p><strong>Staging-only. Fictional company.</strong>
 This action creates an availability schedule and a Cal.com event type.</p>
@@ -116,30 +137,30 @@ I reviewed the fictional company settings, schedule, account, and destination.</
 <button type="submit">Create or verify Cal.com resources</button>
 </form><p><a href="/demo">Back to operations</a></p>""",
         )
+        page.set_cookie(
+            CSRF_COOKIE,
+            nonce,
+            path="/admin/calendar",
+            secure=settings.app_env == "staging",
+            httponly=True,
+            samesite="strict",
+            max_age=CSRF_MAX_AGE,
+        )
+        return page
 
     @router.post(FORM_ACTION, include_in_schema=False)
     async def apply(request: Request) -> Response:
         auth = authenticate(request)
         if isinstance(auth, Response):
             return auth
-        # A normal same-origin browser form can omit Origin (privacy settings,
-        # user-agent differences). An explicitly foreign Origin or cross-site
-        # Fetch Metadata header is still denied. When Origin is absent, the
-        # password-bound HMAC form token below remains mandatory for CSRF defense.
-        host = request.headers.get("host", "")
-        origin = request.headers.get("origin")
-        fetch_site = request.headers.get("sec-fetch-site", "").lower()
-        # Railway can forward a private Host while the browser posts from the
-        # public domain. Trust an explicit deployment-configured public origin.
-        expected = settings.provisioning_admin_origin or (
-            f"{'https' if settings.app_env == 'staging' else request.url.scheme}://{host}"
-        )
-        if not host or (origin is not None and not hmac.compare_digest(origin, expected)):
-            raise HTTPException(status_code=403, detail="Origin not allowed")
-        if fetch_site in {"cross-site", "same-site"}:
-            raise HTTPException(status_code=403, detail="Origin not allowed")
-        if fetch_site not in {"", "none", "same-origin"}:
-            raise HTTPException(status_code=403, detail="Origin not allowed")
+        # A browser session bound to the approved GET is required. The
+        # short-lived, HttpOnly, SameSite=Strict cookie is not sent by browsers
+        # on cross-site POSTs. Require its signed form token below, too.
+        # Do not depend on browser Origin/Fetch-Metadata headers, which can be
+        # modified or omitted by privacy software and intermediate proxies.
+        nonce = request.cookies.get(CSRF_COOKIE)
+        if not _valid_session_nonce(nonce):
+            raise HTTPException(status_code=403, detail="Approval session missing or expired; reopen admin page")
         if request.headers.get("content-type", "").split(";")[0].strip() != "application/x-www-form-urlencoded":
             raise HTTPException(status_code=415)
         raw = await request.body()
@@ -157,7 +178,7 @@ I reviewed the fictional company settings, schedule, account, and destination.</
         draft, digest = _load()
         valid = (
             one("draft_sha256") == digest
-            and hmac.compare_digest(one("csrf_token"), _csrf(auth, digest, draft.instance_key))
+            and hmac.compare_digest(one("csrf_token"), _csrf(auth, digest, draft.instance_key, nonce))
             and one("approve") == "yes"
             and one("confirmation") == f"PROVISION {draft.instance_key}"
         )
