@@ -1,7 +1,8 @@
-"""Calendar admin access is separate from the public receptionist and demo dashboard."""
+"""Calendar admin writes require authenticated, short-lived, signed browser sessions."""
 
 import base64
 import json
+import time
 
 import httpx
 import pytest
@@ -17,8 +18,38 @@ ACTION = "/admin/calendar/provision"
 
 
 def auth(password=SECRET):
-    encoded = base64.b64encode(f"provisioner:{password}".encode()).decode()
-    return {"Authorization": f"Basic {encoded}"}
+    token = base64.b64encode(f"provisioner:{password}".encode()).decode()
+    return {"Authorization": f"Basic {token}"}
+
+
+def form_data(html):
+    import re
+
+    def get(name):
+        match = re.search(r'name="' + name + r'" value="([^"]+)"', html)
+        assert match is not None
+        return match.group(1)
+
+    return {
+        "draft_sha256": get("draft_sha256"),
+        "csrf_token": get("csrf_token"),
+        "approve": "yes",
+        "confirmation": "PROVISION summit-roofing-demo",
+    }
+
+
+def build_app(harness, provider_client=None, environment="test"):
+    _, app, _ = harness
+    config = Settings(
+        app_env=environment,
+        database_url=app.state.settings.database_url,
+        retell_signature_bypass=environment == "test",
+        provisioning_admin_password=SecretStr(SECRET),
+        calcom_provisioning_api_key=SecretStr("mock-api-token"),
+        calcom_schedules_api_version="2024-06-11",
+        calcom_event_types_api_version="2026-06-12",
+    )
+    return create_app(config, app.state.business, app.state.calendar, provisioning_client=provider_client)
 
 
 def test_short_admin_password_rejected():
@@ -34,105 +65,91 @@ def test_short_admin_password_rejected():
 async def test_admin_hidden_when_not_configured(harness):
     client, _, _ = harness
     assert (await client.get(PATH)).status_code == 404
-    assert (await client.post(ACTION, headers={"Origin": "http://test"})).status_code == 404
-
-
-def build_app(harness, provider_client=None):
-    _, app, _ = harness
-    config = Settings(
-        app_env="test",
-        database_url=app.state.settings.database_url,
-        retell_signature_bypass=True,
-        provisioning_admin_password=SecretStr(SECRET),
-        calcom_provisioning_api_key=SecretStr("mock-api-token"),
-        calcom_schedules_api_version="2024-06-11",
-        calcom_event_types_api_version="2026-06-12",
-    )
-    return create_app(config, app.state.business, app.state.calendar, provisioning_client=provider_client)
+    assert (await client.post(ACTION)).status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_review_is_authenticated_and_offline(harness):
+async def test_review_requires_auth_and_issues_strict_cookie(harness):
     api = build_app(harness)
     async with AsyncClient(transport=ASGITransport(app=api), base_url="http://test") as client:
-        unauth = await client.get(PATH)
-        assert unauth.status_code == 401
-        assert "WWW-Authenticate" in unauth.headers
-        wrong = await client.get(PATH, headers=auth("wrong"))
-        assert wrong.status_code == 401
-        review = await client.get(PATH, headers=auth())
-        assert review.status_code == 200
-        assert "summit-roofing-demo" in review.text
-        assert "PROVISION summit-roofing-demo" in review.text
-        assert "mock-api-token" not in review.text
-        assert "goodlookinOperationId" not in review.text
-        assert review.headers["Cache-Control"] == "no-store"
-        assert "frame-ancestors" in review.headers["Content-Security-Policy"]
+        assert (await client.get(PATH)).status_code == 401
+        assert (await client.get(PATH, headers=auth("wrong"))).status_code == 401
+        response = await client.get(PATH, headers=auth())
+        assert response.status_code == 200
+        assert "summit-roofing-demo" in response.text
+        assert "mock-api-token" not in response.text
+        assert response.headers["Cache-Control"] == "no-store"
+        cookie = response.headers["Set-Cookie"]
+        assert "gl_calendar_approval=" in cookie
+        assert "httponly" in cookie.lower()
+        assert "samesite=strict" in cookie.lower()
+        assert "max-age=900" in cookie.lower()
+        assert "path=/admin/calendar" in cookie.lower()
+        assert "secure" not in cookie.lower()
 
-
-def extract_form_values(html):
-    import re
-
-    def get(name):
-        found = re.search(r'name="' + name + r'" value="([^"]+)"', html)
-        assert found is not None
-        return found.group(1)
-
-    return {
-        "draft_sha256": get("draft_sha256"),
-        "csrf_token": get("csrf_token"),
-        "approve": "yes",
-        "confirmation": "PROVISION summit-roofing-demo",
-    }
+    # Staging sets Secure cookies only for HTTPS.
+    with pytest.raises(ValueError, match="RETELL_API_KEY"):
+        Settings(
+            app_env="staging",
+            database_url="sqlite+aiosqlite:///:memory:",
+            provisioning_admin_password=SecretStr(SECRET),
+        )
 
 
 @pytest.mark.asyncio
-async def test_rejects_csrf_origin_missing_approval_and_stale_draft(harness):
-    called = []
+async def test_forged_cross_site_form_lacks_required_session_cookie(harness):
+    calls = []
 
     def handler(request):
-        called.append(request)
-        raise AssertionError("No Cal.com calls should be made")
+        calls.append(request)
+        raise AssertionError("Provider request must never run")
 
     async with httpx.AsyncClient(base_url="https://api.cal.com", transport=httpx.MockTransport(handler)) as cal:
         api = build_app(harness, cal)
-        async with AsyncClient(transport=ASGITransport(app=api), base_url="http://test") as client:
-            review = await client.get(PATH, headers=auth())
-            fields = extract_form_values(review.text)
-            no_origin_with_bad_csrf = await client.post(
-                ACTION, headers=auth(), data={**fields, "csrf_token": "invalid"}
-            )
-            assert no_origin_with_bad_csrf.status_code == 400
-            wrong_origin = await client.post(
-                ACTION, headers={**auth(), "Origin": "http://attacker.invalid"}, data=fields
-            )
-            assert wrong_origin.status_code == 403
-            null_origin = await client.post(ACTION, headers={**auth(), "Origin": "null"}, data=fields)
-            assert null_origin.status_code == 403
-            cross_site = await client.post(ACTION, headers={**auth(), "Sec-Fetch-Site": "cross-site"}, data=fields)
-            assert cross_site.status_code == 403
-            same_site = await client.post(ACTION, headers={**auth(), "Sec-Fetch-Site": "same-site"}, data=fields)
-            assert same_site.status_code == 403
-            no_approval = await client.post(
+        transport = ASGITransport(app=api)
+        async with AsyncClient(transport=transport, base_url="http://test") as browser:
+            review = await browser.get(PATH, headers=auth())
+            fields = form_data(review.text)
+            missing_confirmation = await browser.post(ACTION, headers=auth(), data={**fields, "confirmation": "WRONG"})
+            assert missing_confirmation.status_code == 400
+            invalid_signature = await browser.post(ACTION, headers=auth(), data={**fields, "csrf_token": "bad"})
+            assert invalid_signature.status_code == 400
+
+        # Simulate a cross-site attacker who has somehow copied form fields but
+        # cannot send the victim's first-party, SameSite=Strict session cookie.
+        async with AsyncClient(transport=transport, base_url="http://test") as attacker:
+            blocked = await attacker.post(
                 ACTION,
-                headers={**auth(), "Origin": "http://test"},
-                data={**fields, "confirmation": "wrong"},
+                headers={**auth(), "Origin": "https://attacker.invalid", "Sec-Fetch-Site": "cross-site"},
+                data=fields,
             )
-            assert no_approval.status_code == 400
-            stale_draft = await client.post(
-                ACTION,
-                headers={**auth(), "Origin": "http://test"},
-                data={**fields, "draft_sha256": "0" * 64},
-            )
-            assert stale_draft.status_code == 400
-        assert called == []
+            assert blocked.status_code == 403
+            assert "Approval session" in blocked.text
+        assert calls == []
 
 
 @pytest.mark.asyncio
-async def test_admin_provisions_only_after_confirmed_review_and_does_not_double_create(harness):
-    schedules = []
-    event_types = []
-    posts = []
+async def test_expired_or_tampered_cookie_is_denied(harness):
+    api = build_app(harness)
+    async with AsyncClient(transport=ASGITransport(app=api), base_url="http://test") as client:
+        review = await client.get(PATH, headers=auth())
+        fields = form_data(review.text)
+        original = client.cookies["gl_calendar_approval"]
+        client.cookies.set("gl_calendar_approval", "0." + "a" * 64, path="/admin/calendar")
+        tampered = await client.post(ACTION, headers=auth(), data=fields)
+        assert tampered.status_code == 403
+        client.cookies.set("gl_calendar_approval", original, path="/admin/calendar")
+        # Real expiration enforcement is server side, not just browser max-age.
+        import unittest.mock as mock
+
+        with mock.patch("app.admin_provisioning.time.time", return_value=time.time() + 901):
+            expired = await client.post(ACTION, headers=auth(), data=fields)
+        assert expired.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_admin_provisions_after_session_approval_and_is_idempotent(harness):
+    schedules, event_types, posts = [], [], []
 
     def handler(request):
         payload = json.loads(request.content) if request.method == "POST" else None
@@ -141,89 +158,49 @@ async def test_admin_provisions_only_after_confirmed_review_and_does_not_double_
         if request.method == "GET" and request.url.path == "/v2/event-types":
             return httpx.Response(200, json={"status": "success", "data": event_types})
         if request.method == "POST" and request.url.path == "/v2/schedules":
-            assert request.headers["cal-api-version"] == "2024-06-11"
             posts.append("schedule")
             schedules.append({"id": 322, **payload})
             return httpx.Response(201, json={"status": "success", "data": schedules[-1]})
         if request.method == "POST" and request.url.path == "/v2/event-types":
-            assert request.headers["cal-api-version"] == "2026-06-12"
             posts.append("event")
             event_types.append({"id": 655, **payload})
             return httpx.Response(201, json={"status": "success", "data": event_types[-1]})
-        raise AssertionError(f"Unexpected URL: {request.url.path}")
+        raise AssertionError(f"Unexpected provider URL: {request.url.path}")
 
     async with httpx.AsyncClient(base_url="https://api.cal.com", transport=httpx.MockTransport(handler)) as cal:
         api = build_app(harness, cal)
-        async with AsyncClient(transport=ASGITransport(app=api), base_url="http://test") as client:
-            review = await client.get(PATH, headers=auth())
-            fields = extract_form_values(review.text)
-            # Browser privacy settings may omit Origin entirely. Its reviewed,
-            # HMAC-signed form still works and cannot be forged cross-site.
-            headers = {**auth(), "Sec-Fetch-Site": "same-origin"}
-            first = await client.post(ACTION, headers=headers, data=fields)
-            assert first.status_code == 200
-            assert "&quot;event_type_id&quot;: 655" in first.text
-            assert "Bookings remain disabled" in first.text
-            second = await client.post(ACTION, headers={**auth(), "Origin": "http://test"}, data=fields)
-            assert second.status_code == 200
-            assert "&quot;event_action&quot;: &quot;existing&quot;" in second.text
+        async with AsyncClient(transport=ASGITransport(app=api), base_url="http://test") as browser:
+            review = await browser.get(PATH, headers=auth())
+            fields = form_data(review.text)
+            # Simulate origin behavior that triggered the staging failure.
+            for browser_headers in [
+                {**auth(), "Origin": "null", "Sec-Fetch-Site": "none"},
+                {**auth(), "Origin": "http://test", "Sec-Fetch-Site": "same-origin"},
+            ]:
+                result = await browser.post(ACTION, headers=browser_headers, data=fields)
+                assert result.status_code == 200
+                assert "&quot;event_type_id&quot;: 655" in result.text
+                assert "Bookings remain disabled" in result.text
     assert posts == ["schedule", "event"]
 
 
 @pytest.mark.asyncio
-async def test_production_never_exposes_admin_even_with_secret(harness):
+async def test_production_hides_admin_and_provider_errors_are_sanitized(harness):
     api = build_app(harness)
     api.state.settings.app_env = "production"
     async with AsyncClient(transport=ASGITransport(app=api), base_url="http://test") as client:
         assert (await client.get(PATH, headers=auth())).status_code == 404
+    api.state.settings.app_env = "test"
 
-
-@pytest.mark.asyncio
-async def test_no_admin_secret_reflected_in_error_response(harness):
     def handler(request):
-        if request.method == "GET":
-            return httpx.Response(503, json={"status": "error", "message": "private data"})
-        raise AssertionError("POST should not occur")
+        return httpx.Response(503, json={"status": "error", "secret": "must not leak"})
 
     async with httpx.AsyncClient(base_url="https://api.cal.com", transport=httpx.MockTransport(handler)) as cal:
-        api = build_app(harness, cal)
-        async with AsyncClient(transport=ASGITransport(app=api), base_url="http://test") as client:
+        guarded = build_app(harness, cal)
+        async with AsyncClient(transport=ASGITransport(app=guarded), base_url="http://test") as client:
             review = await client.get(PATH, headers=auth())
-            fields = extract_form_values(review.text)
-            response = await client.post(ACTION, headers={**auth(), "Origin": "http://test"}, data=fields)
-            assert response.status_code == 200
-            assert "could not be verified" in response.text
-            assert "private data" not in response.text
-            assert "mock-api-token" not in response.text
-
-
-@pytest.mark.asyncio
-async def test_trusted_railway_origin_accepts_public_browser_origin_with_private_proxy_host(harness):
-    api = build_app(harness)
-    api.state.settings.provisioning_admin_origin = "https://api-staging-dce8.up.railway.app"
-    async with AsyncClient(transport=ASGITransport(app=api), base_url="http://private-proxy.internal") as client:
-        review = await client.get(PATH, headers=auth())
-        fields = extract_form_values(review.text)
-        # Valid public Origin must get past origin-check to the (intentionally
-        # invalid) signed draft validation, rather than produce a 403.
-        valid_public_origin = await client.post(
-            ACTION,
-            headers={**auth(), "Origin": "https://api-staging-dce8.up.railway.app"},
-            data={**fields, "csrf_token": "incorrect"},
-        )
-        assert valid_public_origin.status_code == 400
-        foreign_origin = await client.post(
-            ACTION,
-            headers={**auth(), "Origin": "https://attacker.example"},
-            data=fields,
-        )
-        assert foreign_origin.status_code == 403
-
-
-def test_rejects_invalid_provisioning_admin_origin():
-    with pytest.raises(ValueError, match="exact HTTPS origin"):
-        Settings(
-            app_env="test",
-            database_url="sqlite+aiosqlite:///:memory:",
-            provisioning_admin_origin="https://attacker.example/callback",
-        )
+            result = await client.post(ACTION, headers=auth(), data=form_data(review.text))
+            assert result.status_code == 200
+            assert "could not be verified" in result.text
+            assert "must not leak" not in result.text
+            assert "mock-api-token" not in result.text

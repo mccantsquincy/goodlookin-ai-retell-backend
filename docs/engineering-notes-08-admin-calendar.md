@@ -55,3 +55,16 @@ The original check required an `Origin` header on **every** browser form POST. S
 This does not create a public provisioning API or relax the dedicated administrator password requirement.
 
 **Reverse proxy note:** Staging sets `PROVISIONING_ADMIN_ORIGIN=https://api-staging-dce8.up.railway.app` to compare browser Origin against the configured public domain rather than potentially internal proxy Host headers. An explicit foreign Origin is always rejected.
+
+## PR #10 — Session-cookie CSRF fix (supersedes Origin-header checks)
+
+A second live 403 after PR #9 confirmed our staging form was still blocked by browser/proxy header validation. We replaced header-dependent allow/deny rules with a **first-party, time-limited, signed approval session**.
+
+- `GET /admin/calendar` after Basic authentication issues a random 256-bit nonce in an `HttpOnly; Secure; SameSite=Strict` cookie (Secure in staging HTTPS, test mode omits Secure for the isolated HTTP test client). The cookie expires after 15 minutes.
+- The hidden form token is HMAC-SHA256 over the Git-reviewed draft hash, instance key and session nonce using the separate admin password.
+- The POST must present that exact first-party cookie and valid HMAC, checked again against the server timestamp and all existing explicit approvals.
+- Browser Origin and Fetch Metadata headers are no longer used as sole proof of origin because some privacy modes and reverse proxies alter them. **Cross-site browser POSTs cannot carry the Strict cookie**, and copied form fields without the cookie cannot create Cal.com resources.
+- The hardcoded `PROVISIONING_ADMIN_ORIGIN` Railway variable is no longer needed by this route. It may remain until the deployment is verified, then can be removed. All role/authorization protections remain staging-only.
+- This is intentionally a one-tenant demo workflow, not a multi-tenant authorization solution.
+
+After merging, open the admin page again (fresh GET) to receive a new session cookie and try the reviewed operation. If browser cookie restrictions block it, the error is now explicitly `Approval session missing or expired`, not an ambiguous origin check.
