@@ -122,11 +122,19 @@ I reviewed the fictional company settings, schedule, account, and destination.</
         auth = authenticate(request)
         if isinstance(auth, Response):
             return auth
-        # Browser-supplied Basic credentials alone do not stop CSRF attacks.
+        # A normal same-origin browser form can omit Origin (privacy settings,
+        # user-agent differences). An explicitly foreign Origin or cross-site
+        # Fetch Metadata header is still denied. When Origin is absent, the
+        # password-bound HMAC form token below remains mandatory for CSRF defense.
         host = request.headers.get("host", "")
-        origin = request.headers.get("origin", "")
+        origin = request.headers.get("origin")
+        fetch_site = request.headers.get("sec-fetch-site", "").lower()
         expected = f"{'https' if settings.app_env == 'staging' else request.url.scheme}://{host}"
-        if not host or origin != expected:
+        if not host or (origin is not None and not hmac.compare_digest(origin, expected)):
+            raise HTTPException(status_code=403, detail="Origin not allowed")
+        if fetch_site in {"cross-site", "same-site"}:
+            raise HTTPException(status_code=403, detail="Origin not allowed")
+        if fetch_site not in {"", "none", "same-origin"}:
             raise HTTPException(status_code=403, detail="Origin not allowed")
         if request.headers.get("content-type", "").split(";")[0].strip() != "application/x-www-form-urlencoded":
             raise HTTPException(status_code=415)
