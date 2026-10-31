@@ -53,3 +53,5 @@ The original check required an `Origin` header on **every** browser form POST. S
 - Tests cover absent Origin, allowed same-origin Fetch Metadata, rejected foreign/null/cross-site, and replay-safe Cal.com resource discovery.
 
 This does not create a public provisioning API or relax the dedicated administrator password requirement.
+
+**Reverse proxy note:** Staging sets `PROVISIONING_ADMIN_ORIGIN=https://api-staging-dce8.up.railway.app` to compare browser Origin against the configured public domain rather than potentially internal proxy Host headers. An explicit foreign Origin is always rejected.

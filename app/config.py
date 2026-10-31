@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     calcom_schedules_api_version: str = ""
     calcom_event_types_api_version: str = ""
     provisioning_admin_password: SecretStr = SecretStr("")
+    provisioning_admin_origin: str = ""
 
     @model_validator(mode="after")
     def safe_signature_configuration(self) -> "Settings":
@@ -40,6 +41,20 @@ class Settings(BaseSettings):
             not self.calcom_api_key.get_secret_value() or not self.calcom_event_type_id or self.calcom_event_type_id < 1
         ):
             raise ValueError("CALCOM_API_KEY and CALCOM_EVENT_TYPE_ID are required for Cal.com calendar")
+        if self.provisioning_admin_origin:
+            from urllib.parse import urlsplit
+
+            parsed = urlsplit(self.provisioning_admin_origin)
+            if (
+                parsed.scheme != "https"
+                or not parsed.hostname
+                or parsed.username
+                or parsed.password
+                or parsed.path
+                or parsed.query
+                or parsed.fragment
+            ):
+                raise ValueError("PROVISIONING_ADMIN_ORIGIN must be an exact HTTPS origin without path")
         admin_password = self.provisioning_admin_password.get_secret_value()
         if admin_password and len(admin_password) < 32:
             raise ValueError("PROVISIONING_ADMIN_PASSWORD must contain at least 32 characters")

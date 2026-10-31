@@ -129,7 +129,11 @@ I reviewed the fictional company settings, schedule, account, and destination.</
         host = request.headers.get("host", "")
         origin = request.headers.get("origin")
         fetch_site = request.headers.get("sec-fetch-site", "").lower()
-        expected = f"{'https' if settings.app_env == 'staging' else request.url.scheme}://{host}"
+        # Railway can forward a private Host while the browser posts from the
+        # public domain. Trust an explicit deployment-configured public origin.
+        expected = settings.provisioning_admin_origin or (
+            f"{'https' if settings.app_env == 'staging' else request.url.scheme}://{host}"
+        )
         if not host or (origin is not None and not hmac.compare_digest(origin, expected)):
             raise HTTPException(status_code=403, detail="Origin not allowed")
         if fetch_site in {"cross-site", "same-site"}:

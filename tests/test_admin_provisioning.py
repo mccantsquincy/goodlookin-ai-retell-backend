@@ -203,3 +203,35 @@ async def test_no_admin_secret_reflected_in_error_response(harness):
             assert "could not be verified" in response.text
             assert "private data" not in response.text
             assert "mock-api-token" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_trusted_railway_origin_accepts_public_browser_origin_with_private_proxy_host(harness):
+    api = build_app(harness)
+    api.state.settings.provisioning_admin_origin = "https://api-staging-dce8.up.railway.app"
+    async with AsyncClient(transport=ASGITransport(app=api), base_url="http://private-proxy.internal") as client:
+        review = await client.get(PATH, headers=auth())
+        fields = extract_form_values(review.text)
+        # Valid public Origin must get past origin-check to the (intentionally
+        # invalid) signed draft validation, rather than produce a 403.
+        valid_public_origin = await client.post(
+            ACTION,
+            headers={**auth(), "Origin": "https://api-staging-dce8.up.railway.app"},
+            data={**fields, "csrf_token": "incorrect"},
+        )
+        assert valid_public_origin.status_code == 400
+        foreign_origin = await client.post(
+            ACTION,
+            headers={**auth(), "Origin": "https://attacker.example"},
+            data=fields,
+        )
+        assert foreign_origin.status_code == 403
+
+
+def test_rejects_invalid_provisioning_admin_origin():
+    with pytest.raises(ValueError, match="exact HTTPS origin"):
+        Settings(
+            app_env="test",
+            database_url="sqlite+aiosqlite:///:memory:",
+            provisioning_admin_origin="https://attacker.example/callback",
+        )
