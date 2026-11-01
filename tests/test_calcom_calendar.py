@@ -19,7 +19,7 @@ def endpoint_payload(tool_name, call_id, **args):
     return {"name": tool_name, "call": {"call_id": call_id}, "args": args}
 
 
-def make_provider(day, *, conflict=False, timeout=False):
+def make_provider(day, *, conflict=False, timeout=False, slots_unavailable=False):
     start = datetime.combine(day, time(11), ZONE)
     end = start + timedelta(hours=1)
     calls = []
@@ -27,6 +27,8 @@ def make_provider(day, *, conflict=False, timeout=False):
     def handler(request: httpx.Request) -> httpx.Response:
         calls.append((request.method, request.url.path, request))
         if request.url.path == "/v2/slots":
+            if slots_unavailable:
+                return httpx.Response(503, json={"status": "error"})
             assert request.headers["cal-api-version"] == "2024-09-04"
             assert request.url.params["format"] == "range"
             return httpx.Response(
@@ -230,3 +232,27 @@ def test_calcom_config_requires_opt_in_credentials():
             calcom_api_key=SecretStr(""),
             calcom_event_type_id=None,
         )
+
+
+@pytest.mark.asyncio
+async def test_calendar_outage_fails_closed_without_making_up_slots(harness):
+    _, app, _ = harness
+    day = (datetime.now(ZONE) + timedelta(days=3)).date()
+    provider, calls = make_provider(day, slots_unavailable=True)
+    demo_app = create_app(app.state.settings, app.state.business, provider)
+    async with AsyncClient(transport=ASGITransport(app=demo_app), base_url="http://test") as client:
+        lead_id = await setup_lead(client, "calendar-outage")
+        response = await client.post(
+            "/v1/retell/tools/get_available_appointments",
+            json=endpoint_payload(
+                "get_available_appointments", "calendar-outage",
+                lead_id=lead_id, preferred_date=day.isoformat()
+            ),
+        )
+        assert response.status_code == 200
+        assert response.json()["ok"] is False
+        assert response.json()["code"] == "CALENDAR_UNAVAILABLE"
+        assert response.json()["data"] == {}
+        assert len(calls) == 1
+        assert calls[0][0:2] == ("GET", "/v2/slots")
+    await provider.client.aclose()
