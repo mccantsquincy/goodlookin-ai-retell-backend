@@ -1,11 +1,12 @@
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
 from sqlalchemy import func, select
 
+from app.calendar import SlotOffer
 from app.config import Settings
 from app.db import Appointment, BookingOperation, CallbackRequest, Lead, WebhookReceipt
 from app.main import create_app
@@ -382,3 +383,77 @@ async def test_invalid_blank_field_has_http_200_but_warning_business_code(harnes
     assert response.json()["code"] == "INVALID_EMAIL"
     assert "INVALID_EMAIL" in caplog.text
     assert "6025550101" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_booking_requires_explicit_confirmation(harness):
+    client, app, _ = harness
+    lead_id = await full_lead(client)
+    day = (datetime.now(ZONE) + timedelta(days=1)).date().isoformat()
+    available = await tool(client, "get_available_appointments", lead_id=lead_id, preferred_date=day)
+    assert available.json()["ok"] is True
+    slot_id = available.json()["data"]["slots"][0]["slot_id"]
+
+    declined = await tool(
+        client, "book_appointment", lead_id=lead_id, slot_id=slot_id, caller_confirmed=False
+    )
+    assert declined.status_code == 200
+    assert declined.json()["ok"] is False
+    assert declined.json()["code"] == "CONFIRMATION_REQUIRED"
+    async with app.state.sessions() as session:
+        assert await session.scalar(select(func.count()).select_from(BookingOperation)) == 0
+        assert await session.scalar(select(func.count()).select_from(Appointment)) == 0
+
+
+@pytest.mark.asyncio
+async def test_another_call_cannot_use_someone_elses_slot_offer(harness):
+    client, app, _ = harness
+    owner_lead = await full_lead(client, "owner-call")
+    other_lead = await full_lead(client, "other-call")
+    day = (datetime.now(ZONE) + timedelta(days=1)).date().isoformat()
+    available = await tool(
+        client, "get_available_appointments", "owner-call", lead_id=owner_lead, preferred_date=day
+    )
+    slot_id = available.json()["data"]["slots"][0]["slot_id"]
+
+    borrowed_offer = await tool(
+        client, "book_appointment", "other-call",
+        lead_id=other_lead, slot_id=slot_id, caller_confirmed=True
+    )
+    assert borrowed_offer.json()["ok"] is False
+    assert borrowed_offer.json()["code"] == "SLOT_UNAVAILABLE"
+
+    borrowed_lead = await tool(
+        client, "book_appointment", "other-call",
+        lead_id=owner_lead, slot_id=slot_id, caller_confirmed=True
+    )
+    assert borrowed_lead.json()["ok"] is False
+    assert borrowed_lead.json()["code"] == "LEAD_NOT_FOUND"
+    async with app.state.sessions() as session:
+        assert await session.scalar(select(func.count()).select_from(BookingOperation)) == 0
+
+
+@pytest.mark.asyncio
+async def test_expired_slot_offer_cannot_be_booked(harness):
+    client, app, _ = harness
+    lead_id = await full_lead(client)
+    day = (datetime.now(ZONE) + timedelta(days=1)).date().isoformat()
+    available = await tool(client, "get_available_appointments", lead_id=lead_id, preferred_date=day)
+    slot_id = available.json()["data"]["slots"][0]["slot_id"]
+
+    # Simulate the ten-minute offer TTL expiring, without sleeping or a live calendar.
+    async with app.state.sessions() as session:
+        offer = await session.get(SlotOffer, slot_id)
+        assert offer is not None
+        offer.expires_at = datetime.now(UTC) - timedelta(minutes=1)
+        await session.commit()
+
+    expired = await tool(
+        client, "book_appointment", lead_id=lead_id, slot_id=slot_id, caller_confirmed=True
+    )
+    assert expired.status_code == 200
+    assert expired.json()["ok"] is False
+    assert expired.json()["code"] == "SLOT_UNAVAILABLE"
+    async with app.state.sessions() as session:
+        assert await session.scalar(select(func.count()).select_from(BookingOperation)) == 0
+        assert await session.scalar(select(func.count()).select_from(Appointment)) == 0
