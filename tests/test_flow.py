@@ -394,9 +394,7 @@ async def test_booking_requires_explicit_confirmation(harness):
     assert available.json()["ok"] is True
     slot_id = available.json()["data"]["slots"][0]["slot_id"]
 
-    declined = await tool(
-        client, "book_appointment", lead_id=lead_id, slot_id=slot_id, caller_confirmed=False
-    )
+    declined = await tool(client, "book_appointment", lead_id=lead_id, slot_id=slot_id, caller_confirmed=False)
     assert declined.status_code == 200
     assert declined.json()["ok"] is False
     assert declined.json()["code"] == "CONFIRMATION_REQUIRED"
@@ -411,21 +409,17 @@ async def test_another_call_cannot_use_someone_elses_slot_offer(harness):
     owner_lead = await full_lead(client, "owner-call")
     other_lead = await full_lead(client, "other-call")
     day = (datetime.now(ZONE) + timedelta(days=1)).date().isoformat()
-    available = await tool(
-        client, "get_available_appointments", "owner-call", lead_id=owner_lead, preferred_date=day
-    )
+    available = await tool(client, "get_available_appointments", "owner-call", lead_id=owner_lead, preferred_date=day)
     slot_id = available.json()["data"]["slots"][0]["slot_id"]
 
     borrowed_offer = await tool(
-        client, "book_appointment", "other-call",
-        lead_id=other_lead, slot_id=slot_id, caller_confirmed=True
+        client, "book_appointment", "other-call", lead_id=other_lead, slot_id=slot_id, caller_confirmed=True
     )
     assert borrowed_offer.json()["ok"] is False
     assert borrowed_offer.json()["code"] == "SLOT_UNAVAILABLE"
 
     borrowed_lead = await tool(
-        client, "book_appointment", "other-call",
-        lead_id=owner_lead, slot_id=slot_id, caller_confirmed=True
+        client, "book_appointment", "other-call", lead_id=owner_lead, slot_id=slot_id, caller_confirmed=True
     )
     assert borrowed_lead.json()["ok"] is False
     assert borrowed_lead.json()["code"] == "LEAD_NOT_FOUND"
@@ -448,9 +442,7 @@ async def test_expired_slot_offer_cannot_be_booked(harness):
         offer.expires_at = datetime.now(UTC) - timedelta(minutes=1)
         await session.commit()
 
-    expired = await tool(
-        client, "book_appointment", lead_id=lead_id, slot_id=slot_id, caller_confirmed=True
-    )
+    expired = await tool(client, "book_appointment", lead_id=lead_id, slot_id=slot_id, caller_confirmed=True)
     assert expired.status_code == 200
     assert expired.json()["ok"] is False
     assert expired.json()["code"] == "SLOT_UNAVAILABLE"
