@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+# Limit GITHUB_TOKEN permissions for all CI jobs.
+permissions:
+  contents: read
+
 jobs:
   unit-and-flow:
     runs-on: ubuntu-latest
