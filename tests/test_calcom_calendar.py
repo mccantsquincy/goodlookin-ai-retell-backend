@@ -245,8 +245,7 @@ async def test_calendar_outage_fails_closed_without_making_up_slots(harness):
         response = await client.post(
             "/v1/retell/tools/get_available_appointments",
             json=endpoint_payload(
-                "get_available_appointments", "calendar-outage",
-                lead_id=lead_id, preferred_date=day.isoformat()
+                "get_available_appointments", "calendar-outage", lead_id=lead_id, preferred_date=day.isoformat()
             ),
         )
         assert response.status_code == 200
