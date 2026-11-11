@@ -94,10 +94,9 @@ def make_provider(day, *, conflict=False, timeout=False, slots_unavailable=False
     return CalComCalendar("fake-test-api-key", 123, client), calls
 
 
-async def setup_lead(client, call_id, *, include_email=True):
+async def setup_lead(client, call_id, *, include_email=True, include_name=True):
     data = {
         "callback_phone": "6025550101",
-        "name": "Demo Caller",
         "street_address": "123 Test Street",
         "city": "Phoenix",
         "state": "AZ",
@@ -107,6 +106,8 @@ async def setup_lead(client, call_id, *, include_email=True):
         "issue_summary": "Request a roof inspection",
         "authorized_contact": True,
     }
+    if include_name:
+        data["name"] = "Demo Caller"
     if include_email:
         data["email"] = "demo@example.com"
     response = await client.post("/v1/retell/tools/save_lead", json=endpoint_payload("save_lead", call_id, **data))
@@ -233,26 +234,80 @@ async def test_ambiguous_provider_timeout_is_pending_and_not_reposted(harness):
 
 
 @pytest.mark.asyncio
-async def test_missing_email_is_refused_before_booking_post(harness):
+@pytest.mark.parametrize(
+    ("include_name", "include_email", "expected_missing"),
+    [
+        (False, True, ["name"]),
+        (True, False, ["email"]),
+        (False, False, ["name", "email"]),
+    ],
+)
+async def test_missing_contact_is_reported_then_recovered_without_duplicate_booking(
+    harness, include_name, include_email, expected_missing
+):
     _, app, _ = harness
     day = (datetime.now(ZONE) + timedelta(days=3)).date()
     provider, calls = make_provider(day)
     demo_app = create_app(app.state.settings, app.state.business, provider)
     async with AsyncClient(transport=ASGITransport(app=demo_app), base_url="http://test") as client:
-        lead_id = await setup_lead(client, "no-email", include_email=False)
+        call_id = "booking-contact-recovery"
+        lead_id = await setup_lead(
+            client, call_id, include_name=include_name, include_email=include_email
+        )
+        offered = await client.post(
+            "/v1/retell/tools/get_available_appointments",
+            json=endpoint_payload(
+                "get_available_appointments", call_id, lead_id=lead_id, preferred_date=day.isoformat()
+            ),
+        )
+        assert offered.status_code == 200
+        assert offered.json()["ok"] is False
+        assert offered.json()["code"] == "BOOKING_CONTACT_DETAILS_REQUIRED"
+        assert offered.json()["data"] == {"missing_fields": expected_missing}
+        assert calls == []  # Never ask Cal.com for slots with missing booking contact data.
+
+        direct_booking = await client.post(
+            "/v1/retell/tools/book_appointment",
+            json=endpoint_payload(
+                "book_appointment", call_id, lead_id=lead_id, slot_id="not-an-offer",
+                caller_confirmed=True,
+            ),
+        )
+        assert direct_booking.json()["ok"] is False
+        assert direct_booking.json()["code"] == "BOOKING_CONTACT_DETAILS_REQUIRED"
+        assert direct_booking.json()["data"]["missing_fields"] == expected_missing
+        assert calls == []
+
+        updates = {"callback_phone": "6025550101", "lead_id": lead_id}
+        if "name" in expected_missing:
+            updates["name"] = "Demo Caller"
+        if "email" in expected_missing:
+            updates["email"] = "demo@example.com"
+        saved = await client.post(
+            "/v1/retell/tools/save_lead", json=endpoint_payload("save_lead", call_id, **updates)
+        )
+        assert saved.json()["ok"] is True
+        assert saved.json()["data"]["lead_id"] == lead_id
+        assert saved.json()["data"]["booking_contact_ready"] is True
+        assert saved.json()["data"]["booking_missing_fields"] == []
+
         available = await client.post(
             "/v1/retell/tools/get_available_appointments",
             json=endpoint_payload(
-                "get_available_appointments", "no-email", lead_id=lead_id, preferred_date=day.isoformat()
+                "get_available_appointments", call_id, lead_id=lead_id, preferred_date=day.isoformat()
             ),
         )
-        slot = available.json()["data"]["slots"][0]["slot_id"]
+        assert available.json()["ok"] is True
+        slot_id = available.json()["data"]["slots"][0]["slot_id"]
         booking = await client.post(
             "/v1/retell/tools/book_appointment",
-            json=endpoint_payload("book_appointment", "no-email", lead_id=lead_id, slot_id=slot, caller_confirmed=True),
+            json=endpoint_payload(
+                "book_appointment", call_id, lead_id=lead_id, slot_id=slot_id, caller_confirmed=True
+            ),
         )
-        assert booking.json()["code"] == "BOOKING_CONTACT_DETAILS_REQUIRED"
-        assert not [item for item in calls if item[0] == "POST"]
+        assert booking.json()["ok"] is True
+        assert booking.json()["data"]["status"] == "confirmed"
+        assert len([item for item in calls if item[0:2] == ("POST", "/v2/bookings")]) == 1
     await provider.client.aclose()
 
 
