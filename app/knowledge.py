@@ -7,6 +7,7 @@ retrieved approved answer, but it must not invent missing business facts.
 import re
 
 from app.business import BusinessConfig
+from app.normalize import state as normalize_state
 
 STOP = {"a", "an", "the", "is", "are", "do", "does", "i", "you", "we", "for", "of", "to", "with", "and", "what", "how"}
 
@@ -43,12 +44,15 @@ def search_knowledge(config: BusinessConfig, question: str, limit: int = 3) -> d
 
 def service_area_check(config: BusinessConfig, state: str, postal_code: str, service_type: str | None) -> dict:
     """Business decisions belong to code, not the knowledge model."""
-    normalized_state = state.strip().upper()
     zip5 = postal_code.strip()
     if not re.fullmatch(r"\d{5}", zip5):
         return {"status": "needs_review", "reason_code": "INVALID_POSTAL_CODE"}
     if not config.eligible_states or not config.eligible_postal_codes:
         return {"status": "needs_review", "reason_code": "POLICY_NOT_CONFIGURED"}
+    try:
+        normalized_state = normalize_state(state)
+    except ValueError:
+        return {"status": "needs_review", "reason_code": "INVALID_STATE"}
     if normalized_state not in {name.upper() for name in config.eligible_states}:
         return {"status": "outside_area", "reason_code": "STATE_OUTSIDE_CONFIGURED_AREA"}
     if zip5 not in config.eligible_postal_codes:

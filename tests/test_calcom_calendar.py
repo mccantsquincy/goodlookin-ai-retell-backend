@@ -19,8 +19,8 @@ def endpoint_payload(tool_name, call_id, **args):
     return {"name": tool_name, "call": {"call_id": call_id}, "args": args}
 
 
-def make_provider(day, *, conflict=False, timeout=False, slots_unavailable=False):
-    start = datetime.combine(day, time(11), ZONE)
+def make_provider(day, *, conflict=False, timeout=False, slots_unavailable=False, slot_hour=11):
+    start = datetime.combine(day, time(slot_hour), ZONE)
     end = start + timedelta(hours=1)
     calls = []
 
@@ -35,7 +35,14 @@ def make_provider(day, *, conflict=False, timeout=False, slots_unavailable=False
                 200,
                 json={
                     "status": "success",
-                    "data": {day.isoformat(): [{"start": start.isoformat(), "end": end.isoformat()}]},
+                    "data": {
+                        day.isoformat(): [
+                            {
+                                "start": start.astimezone(UTC).isoformat().replace("+00:00", "Z"),
+                                "end": end.astimezone(UTC).isoformat().replace("+00:00", "Z"),
+                            }
+                        ]
+                    },
                 },
             )
         if request.url.path == "/v2/bookings" and request.method == "GET":
@@ -124,7 +131,8 @@ async def test_live_slots_and_confirmed_booking_are_idempotent(harness):
         assert offer.json()["ok"] is True
         slots = offer.json()["data"]["slots"]
         assert len(slots) == 1
-        assert slots[0]["starts_at"].startswith(day.isoformat())
+        assert slots[0]["starts_at"] == datetime.combine(day, time(11), ZONE).isoformat()
+        assert slots[0]["spoken_label"] == day.strftime("%A, %B %-d at 11 AM")
 
         booking = await client.post(
             "/v1/retell/tools/book_appointment",
@@ -144,6 +152,31 @@ async def test_live_slots_and_confirmed_booking_are_idempotent(harness):
         )
         assert repeat.json()["data"]["status"] == "confirmed"
         assert len([x for x in calls if x[0] == "POST"]) == 1
+    await provider.client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_utc_midnight_rollover_keeps_slot_label_on_phoenix_date(harness):
+    _, app, _ = harness
+    day = (datetime.now(ZONE) + timedelta(days=3)).date()
+    provider, _ = make_provider(day, slot_hour=17)
+    demo_app = create_app(app.state.settings, app.state.business, provider)
+    async with AsyncClient(transport=ASGITransport(app=demo_app), base_url="http://test") as client:
+        lead_id = await setup_lead(client, "calcom-phoenix-evening")
+        offer = await client.post(
+            "/v1/retell/tools/get_available_appointments",
+            json=endpoint_payload(
+                "get_available_appointments",
+                "calcom-phoenix-evening",
+                lead_id=lead_id,
+                preferred_date=day.isoformat(),
+            ),
+        )
+        assert offer.json()["ok"] is True
+        slots = offer.json()["data"]["slots"]
+        assert len(slots) == 1
+        assert slots[0]["starts_at"] == datetime.combine(day, time(17), ZONE).isoformat()
+        assert slots[0]["spoken_label"] == day.strftime("%A, %B %-d at 5 PM")
     await provider.client.aclose()
 
 

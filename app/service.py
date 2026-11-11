@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.business import BusinessConfig, eligibility, missing_fields
 from app.calcom_calendar import CalendarUnavailable
 from app.calendar import (
+    ZONE,
     CalendarAdapter,
     CalendarCommittedTimeout,
     SlotOffer,
@@ -94,6 +95,8 @@ async def availability(
         )
         if booked:
             continue
+        local_start = start.astimezone(ZONE)
+        local_end = end.astimezone(ZONE)
         offer = SlotOffer(
             id=str(uuid4()),
             call_id=call_id,
@@ -107,9 +110,9 @@ async def availability(
         slots.append(
             {
                 "slot_id": offer.id,
-                "starts_at": start.isoformat(),
-                "ends_at": end.isoformat(),
-                "spoken_label": start.strftime("%A, %B %-d at %-I %p"),
+                "starts_at": local_start.isoformat(),
+                "ends_at": local_end.isoformat(),
+                "spoken_label": local_start.strftime("%A, %B %-d at %-I %p"),
                 "expires_at": offer.expires_at.isoformat(),
             }
         )
