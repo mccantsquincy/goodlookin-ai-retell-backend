@@ -251,9 +251,7 @@ async def test_missing_contact_is_reported_then_recovered_without_duplicate_book
     demo_app = create_app(app.state.settings, app.state.business, provider)
     async with AsyncClient(transport=ASGITransport(app=demo_app), base_url="http://test") as client:
         call_id = "booking-contact-recovery"
-        lead_id = await setup_lead(
-            client, call_id, include_name=include_name, include_email=include_email
-        )
+        lead_id = await setup_lead(client, call_id, include_name=include_name, include_email=include_email)
         offered = await client.post(
             "/v1/retell/tools/get_available_appointments",
             json=endpoint_payload(
@@ -269,7 +267,10 @@ async def test_missing_contact_is_reported_then_recovered_without_duplicate_book
         direct_booking = await client.post(
             "/v1/retell/tools/book_appointment",
             json=endpoint_payload(
-                "book_appointment", call_id, lead_id=lead_id, slot_id="not-an-offer",
+                "book_appointment",
+                call_id,
+                lead_id=lead_id,
+                slot_id="not-an-offer",
                 caller_confirmed=True,
             ),
         )
@@ -283,9 +284,7 @@ async def test_missing_contact_is_reported_then_recovered_without_duplicate_book
             updates["name"] = "Demo Caller"
         if "email" in expected_missing:
             updates["email"] = "demo@example.com"
-        saved = await client.post(
-            "/v1/retell/tools/save_lead", json=endpoint_payload("save_lead", call_id, **updates)
-        )
+        saved = await client.post("/v1/retell/tools/save_lead", json=endpoint_payload("save_lead", call_id, **updates))
         assert saved.json()["ok"] is True
         assert saved.json()["data"]["lead_id"] == lead_id
         assert saved.json()["data"]["booking_contact_ready"] is True
@@ -301,9 +300,7 @@ async def test_missing_contact_is_reported_then_recovered_without_duplicate_book
         slot_id = available.json()["data"]["slots"][0]["slot_id"]
         booking = await client.post(
             "/v1/retell/tools/book_appointment",
-            json=endpoint_payload(
-                "book_appointment", call_id, lead_id=lead_id, slot_id=slot_id, caller_confirmed=True
-            ),
+            json=endpoint_payload("book_appointment", call_id, lead_id=lead_id, slot_id=slot_id, caller_confirmed=True),
         )
         assert booking.json()["ok"] is True
         assert booking.json()["data"]["status"] == "confirmed"
