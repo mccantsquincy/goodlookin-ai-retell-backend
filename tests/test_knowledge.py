@@ -37,8 +37,13 @@ def test_faq_does_not_guess_missing_answer(demo_business):
     ("state", "postal_code", "service_type", "expected"),
     [
         ("AZ", "85251", "inspection", "in_area"),
+        ("Arizona", "85251", "inspection", "in_area"),
+        (" arizona ", "85251", "inspection", "in_area"),
+        ("AZ.", "85251", "inspection", "in_area"),
         ("AZ", "85252", "inspection", "outside_area"),
         ("CA", "85251", "inspection", "outside_area"),
+        ("California", "85251", "inspection", "outside_area"),
+        ("Atlantis", "85251", "inspection", "needs_review"),
         ("AZ", "not-a-zip", "inspection", "needs_review"),
         ("AZ", "85251", None, "needs_review"),
         ("AZ", "85251", "roof installation", "needs_review"),
@@ -46,6 +51,11 @@ def test_faq_does_not_guess_missing_answer(demo_business):
 )
 def test_service_area_is_not_decided_by_language_model(demo_business, state, postal_code, service_type, expected):
     assert service_area_check(demo_business, state, postal_code, service_type)["status"] == expected
+
+
+def test_unknown_state_fails_closed_with_a_review_reason(demo_business):
+    result = service_area_check(demo_business, "Atlantis", "85251", "inspection")
+    assert result == {"status": "needs_review", "reason_code": "INVALID_STATE"}
 
 
 @pytest.mark.asyncio
@@ -57,7 +67,7 @@ async def test_new_retell_tools_through_signed_backend_contract(harness):
     assert found.json()["ok"] is True
     assert found.json()["data"]["matches"][0]["answer"] == "Nine to five."
     coverage = await tool(
-        client, "check_service_area", "knowledge-call", state="AZ", postal_code="85001", service_type="inspection"
+        client, "check_service_area", "knowledge-call", state="Arizona", postal_code="85001", service_type="inspection"
     )
     assert coverage.json()["ok"] is True
     assert coverage.json()["data"]["status"] == "in_area"
