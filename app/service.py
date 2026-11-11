@@ -53,6 +53,15 @@ async def owned_lead(session: AsyncSession, call_id: str, lead_id: str) -> Lead:
     return lead
 
 
+def booking_contact_missing_fields(lead: Lead) -> list[str]:
+    """Name and email are mandatory for Cal.com bookings, but not for basic lead intake."""
+    return [
+        field
+        for field in ("name", "email")
+        if not isinstance(getattr(lead, field, None), str) or not getattr(lead, field).strip()
+    ]
+
+
 async def save_lead(session: AsyncSession, call_id: str, args: SaveLeadArgs, crm: CRMAdapter) -> dict:
     try:
         lead = await crm.upsert_lead(session, call_id, args)
@@ -61,7 +70,14 @@ async def save_lead(session: AsyncSession, call_id: str, args: SaveLeadArgs, crm
     except ValueError as exc:
         code, _, field = str(exc).partition(":")
         raise BusinessFailure(code, {"field": field} if field else {}) from None
-    return {"saved": True, "lead_id": lead.id, "missing_fields": missing_fields(lead)}
+    contact_missing = booking_contact_missing_fields(lead)
+    return {
+        "saved": True,
+        "lead_id": lead.id,
+        "missing_fields": missing_fields(lead),
+        "booking_contact_ready": not contact_missing,
+        "booking_missing_fields": contact_missing,
+    }
 
 
 async def check_eligibility(session: AsyncSession, call_id: str, args: LeadIdArgs, config: BusinessConfig) -> dict:
@@ -82,6 +98,9 @@ async def availability(
         raise BusinessFailure("NOT_ELIGIBLE", result)
     if not config.booking_enabled:
         raise BusinessFailure("BOOKING_DISABLED")
+    contact_missing = booking_contact_missing_fields(lead)
+    if getattr(calendar, "requires_contact_details", False) and contact_missing:
+        raise BusinessFailure("BOOKING_CONTACT_DETAILS_REQUIRED", {"missing_fields": contact_missing})
     slots = []
     try:
         available_slots = await calendar.available_slots(args.preferred_date, at)
@@ -186,8 +205,9 @@ async def book(
         if existing.status == "failed":
             raise BusinessFailure(existing.error_code or "BOOKING_FAILED", booking_data(existing))
         return booking_data(existing)
-    if getattr(calendar, "requires_contact_details", False) and (not lead.name or not lead.email):
-        raise BusinessFailure("BOOKING_CONTACT_DETAILS_REQUIRED")
+    contact_missing = booking_contact_missing_fields(lead)
+    if getattr(calendar, "requires_contact_details", False) and contact_missing:
+        raise BusinessFailure("BOOKING_CONTACT_DETAILS_REQUIRED", {"missing_fields": contact_missing})
     if eligibility(lead, config)["eligibility"] != "eligible":
         raise BusinessFailure("NOT_ELIGIBLE")
     if not config.booking_enabled:
