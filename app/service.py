@@ -11,11 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.business import BusinessConfig, eligibility, missing_fields
 from app.calcom_calendar import CalendarUnavailable
 from app.calendar import (
+    ZONE,
     CalendarAdapter,
     CalendarCommittedTimeout,
     SlotOffer,
     SlotUnavailable,
-    ZONE,
     offer_expiration,
 )
 from app.contracts import (
