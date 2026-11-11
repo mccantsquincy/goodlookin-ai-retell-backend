@@ -15,6 +15,7 @@ from app.calendar import (
     CalendarCommittedTimeout,
     SlotOffer,
     SlotUnavailable,
+    ZONE,
     offer_expiration,
 )
 from app.contracts import (
@@ -94,6 +95,8 @@ async def availability(
         )
         if booked:
             continue
+        local_start = start.astimezone(ZONE)
+        local_end = end.astimezone(ZONE)
         offer = SlotOffer(
             id=str(uuid4()),
             call_id=call_id,
@@ -107,9 +110,9 @@ async def availability(
         slots.append(
             {
                 "slot_id": offer.id,
-                "starts_at": start.isoformat(),
-                "ends_at": end.isoformat(),
-                "spoken_label": start.strftime("%A, %B %-d at %-I %p"),
+                "starts_at": local_start.isoformat(),
+                "ends_at": local_end.isoformat(),
+                "spoken_label": local_start.strftime("%A, %B %-d at %-I %p"),
                 "expires_at": offer.expires_at.isoformat(),
             }
         )
